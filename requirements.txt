@@ -1,0 +1,7 @@
+pycapacity
+meshcat
+ipywidgets
+ipympl
+pin
+jupyter
+example-robot-data
