@@ -1,8 +1,4 @@
-# Reachy2 robot task space capacity analysis tools 
-
-This repo implements simple tools for evaluating reachy2 robot task space capacity. The tools are implemented in python and use task space capacity analsyis package called `pycapacity`. It uses the `pinocchio` library for forward kinematics and jacobian computation.
-
-<img src="imgs/reachy.png" height="300px">
+# Reachy2 robot moodelling and performance evaluation
 
 ## Installing the necessary packages manually
 
@@ -78,7 +74,3 @@ You can then launch the juptyer notebook and run the code
 ```bash
 jupyter lab
 ```
-
-You'll be able to see the force polytopes of the robot in the task space, which represent the robot's abilitiy to apply and resist forces in different direction in space. And additionally you'll see the robot's ability to carry weight shown underneath in the text form.
-
-<img src="imgs/output.gif">
