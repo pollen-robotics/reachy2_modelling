@@ -5,3 +5,4 @@ ipympl
 pin
 jupyter
 example-robot-data
+pin-pink
