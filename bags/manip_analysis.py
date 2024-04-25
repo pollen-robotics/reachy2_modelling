@@ -41,18 +41,39 @@ tolock = [
     'neck_yaw',
 ]
 
+# tolock = [
+#     'r_shoulder_pitch',
+#     'r_shoulder_roll',
+#     'r_elbow_yaw',
+#     'r_elbow_pitch',
+#     'r_wrist_roll',
+#     'r_wrist_pitch',
+#     'r_wrist_yaw',
+#     'r_hand_finger',
+#     'r_hand_finger_mimic',
+#     # 'l_wrist_roll',
+#     # 'l_wrist_pitch',
+#     # 'l_wrist_yaw',
+#     'l_hand_finger',
+#     'l_hand_finger_mimic',
+#     'neck_roll',
+#     'neck_pitch',
+#     'neck_yaw',
+# ]
+
 # Get the ID of all existing joints
 jointsToLockIDs = []
 for jn in tolock:
     if model.existJointName(jn):
         jointsToLockIDs.append(model.getJointId(jn))
 robot.model = pin.buildReducedModel(model, jointsToLockIDs, np.zeros(21))
+robot.data = robot.model.createData()
 
 
-def jacobian(q, tip=None, robot=robot):
+def jacobian_frame(q, tip=None, robot=robot):
     if tip is None:
         tip = robot.model.frames[-1].name
-    joint_id = model.getFrameId(tip)
+    joint_id = robot.model.getFrameId(tip)
     J = pin.computeFrameJacobian(robot.model,
                                  robot.data,
                                  q,
@@ -61,15 +82,30 @@ def jacobian(q, tip=None, robot=robot):
     return J
 
 
+def jacobian_joint(q, tip=None, robot=robot):
+    joint_id = robot.model.getJointId(tip)
+    J = pin.computeJointJacobian(robot.model,
+                                 robot.data,
+                                 q,
+                                 joint_id)
+    return J
+
+
 def svals(J):
     u, s, v = np.linalg.svd(J)
     return s
 
+def manip(J):
+    return np.sqrt(np.linalg.det(J.T@J))
 
-def fk(q, tip=robot.model.frames[-1].name, robot=robot):
+
+def fk(q, tip=None, robot=robot):
     # joint_id =  robot.model.getFrameId(robot.model.frames[-1].name)
+    if tip is None:
+        tip = robot.model.frames[-1].name
     joint_id = robot.model.getFrameId(tip)
     pin.framesForwardKinematics(robot.model, robot.data, q)
+    # pin.computeJointJacobians(robot.model, robot.data, q)
     return robot.data.oMf[robot.model.getFrameId(tip)].copy()
 
 
@@ -280,28 +316,43 @@ with open(args.csvfile, newline='') as csvfile:
         ])
         # print(M)
         q, reachable, multiturn = ik.symbolic_inverse_kinematics('l_arm', M)
-        J = jacobian(q)
+
+        # tip = 'r_elbow_ball_link' # as frame
+        # tip = 'r_elbow_dummy_link'
+        # tip = 'r_shoulder_ball_link'
+        tip = 'r_elbow_pitch'  # joint
+        # tip = None
+        fkk = fk(q, tip=tip)
+        # J = jacobian_frame(q, tip=tip)[:3, :]
+        J = jacobian_joint(q, tip=tip)[:3, :]
+        manipp = manip(J) # TODO: NOT WORKING
         rank = np.linalg.matrix_rank(J)
         svalues = svals(J)
-        if np.min(svalues) < 0.15:
+        nsvalues = 2
+        # if manipp > 0.1:
+        #     print_all()
+        #     sys.exit(0)
+
+        def print_all():
+            print('rank', rank)
+            print('multiturn:', multiturn)
+            print('q:', q)
+            print('svalues:', svalues)
+            print('manip: {:.10f}'.format(manipp))
+            print(fkk)
+            print(J)
+
+        if np.min(svalues[:nsvalues]) < 0.22:
             print('-------------')
-            print('svalues LOWW')
-            print(svalues)
-            print(J)
-            print('rank', rank)
+            print('svalues LOWW i:', i)
+            print_all()
 
-
-        if rank != 6:
+        if rank != nsvalues:
             print('------------------')
-            print('rank not 6!!')
-            print(J)
-            print('rank', rank)
-            print(svals(J))
+            print('rank != J.shape[0] i:', i)
+            print_all()
 
         if multiturn:
             print('-------------')
-            print('multiturn')
-            J = jacobian(q)
-            print(J)
-            print('rank', np.linalg.matrix_rank(J))
-            print(svals(J))
+            print('multiturn detected!, i:', i)
+            print_all()
