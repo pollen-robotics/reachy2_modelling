@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import pinocchio as pin
 from typing import Tuple
 import argparse
 import numpy as np
@@ -13,6 +14,63 @@ from reachy2_symbolic_ik.utils import (angle_diff, get_best_continuous_theta,
                                        tend_to_prefered_theta)
 
 from scipy.spatial.transform import Rotation
+
+np.set_printoptions(formatter={'float': lambda x: "{0:0.2f}".format(x)})
+
+urdf_path = '../reachy.urdf'
+robot = pin.RobotWrapper.BuildFromURDF(urdf_path)
+model, data = robot.model, robot.data
+# lock the other joints
+tolock = [
+    'l_shoulder_pitch',
+    'l_shoulder_roll',
+    'l_elbow_yaw',
+    'l_elbow_pitch',
+    'l_wrist_roll',
+    'l_wrist_pitch',
+    'l_wrist_yaw',
+    'l_hand_finger',
+    'l_hand_finger_mimic',
+    # 'r_wrist_roll',
+    # 'r_wrist_pitch',
+    # 'r_wrist_yaw',
+    'r_hand_finger',
+    'r_hand_finger_mimic',
+    'neck_roll',
+    'neck_pitch',
+    'neck_yaw',
+]
+
+# Get the ID of all existing joints
+jointsToLockIDs = []
+for jn in tolock:
+    if model.existJointName(jn):
+        jointsToLockIDs.append(model.getJointId(jn))
+robot.model = pin.buildReducedModel(model, jointsToLockIDs, np.zeros(21))
+
+
+def jacobian(q, tip=None, robot=robot):
+    if tip is None:
+        tip = robot.model.frames[-1].name
+    joint_id = model.getFrameId(tip)
+    J = pin.computeFrameJacobian(robot.model,
+                                 robot.data,
+                                 q,
+                                 joint_id,
+                                 reference_frame=pin.LOCAL_WORLD_ALIGNED)
+    return J
+
+
+def svals(J):
+    u, s, v = np.linalg.svd(J)
+    return s
+
+
+def fk(q, tip=robot.model.frames[-1].name, robot=robot):
+    # joint_id =  robot.model.getFrameId(robot.model.frames[-1].name)
+    joint_id = robot.model.getFrameId(tip)
+    pin.framesForwardKinematics(robot.model, robot.data, q)
+    return robot.data.oMf[robot.model.getFrameId(tip)].copy()
 
 
 def inverse_kinematics(ik_solver, q0: np.ndarray, target_pose: np.ndarray,
@@ -162,15 +220,15 @@ class MySymIK:
 
         # self.logger.warning(f"{name} jump in joint space")
 
-        self.ik_joints = self.allow_multiturn(self.ik_joints,
-                                              self.previous_sol[name])
+        self.ik_joints, multiturn = self.allow_multiturn(
+            self.ik_joints, self.previous_sol[name])
 
         self.previous_sol[name] = self.ik_joints
         # self.logger.info(f"{name} ik={self.ik_joints}, elbow={elbow_position}")
 
         # TODO reactivate a smoothing technique
 
-        return self.ik_joints, is_reachable
+        return self.ik_joints, is_reachable, multiturn
 
     def allow_multiturn(self, new_joints, prev_joints):
         """This function will always guarantee that the joint takes the shortest path to the new position.
@@ -182,14 +240,16 @@ class MySymIK:
 
         # Temp : showing a warning if a multiturn is detected. TODO do better. This info is critical and should be saved dyamically on disk.
         indexes_that_can_multiturn = [0, 2, 6]
+        multiturn = False
         for index in indexes_that_can_multiturn:
             if abs(new_joints[index]) > np.pi:
-                print(
-                    f"Multiturn detected on joint {index} with value: {new_joints[index]} @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-                )
+                multiturn = True
+                # print(
+                #     f"Multiturn detected on joint {index} with value: {new_joints[index]} @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+                # )
                 # TEMP forbidding multiturn
                 #new_joints[index] = np.sign(new_joints[index]) * np.pi
-        return new_joints
+        return new_joints, multiturn
 
 
 parser = argparse.ArgumentParser()
@@ -201,14 +261,8 @@ print('csvfile:', args.csvfile)
 
 csvfilebase = args.csvfile[:-4]
 outcsvfile = '{}_symik.csv'.format(csvfilebase)
-print('outcsv:', outcsvfile)
 
-outcsv = open(outcsvfile, 'w', newline='')
-csvw = csv.writer(outcsv, delimiter=',')
-
-csvw.writerow(['q{}'.format(1 + i) for i in np.arange(7)] + ['reachable'])
-
-print('computing output to csv...')
+print('computing manip to csv...')
 with open(args.csvfile, newline='') as csvfile:
     i = 0
     reader = csv.DictReader(csvfile)
@@ -225,6 +279,29 @@ with open(args.csvfile, newline='') as csvfile:
             row['pos_z'],
         ])
         # print(M)
-        q, reachable = ik.symbolic_inverse_kinematics('l_arm', M)
-        # print(q, reachable)
-        csvw.writerow([*q, reachable])
+        q, reachable, multiturn = ik.symbolic_inverse_kinematics('l_arm', M)
+        J = jacobian(q)
+        rank = np.linalg.matrix_rank(J)
+        svalues = svals(J)
+        if np.min(svalues) < 0.15:
+            print('-------------')
+            print('svalues LOWW')
+            print(svalues)
+            print(J)
+            print('rank', rank)
+
+
+        if rank != 6:
+            print('------------------')
+            print('rank not 6!!')
+            print(J)
+            print('rank', rank)
+            print(svals(J))
+
+        if multiturn:
+            print('-------------')
+            print('multiturn')
+            J = jacobian(q)
+            print(J)
+            print('rank', np.linalg.matrix_rank(J))
+            print(svals(J))
