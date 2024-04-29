@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+import os
+import pickle
+import types
+import pinocchio as pin
 from typing import Tuple
 import argparse
 import numpy as np
@@ -17,10 +21,109 @@ from reachy2_symbolic_ik.utils import (
 
 from scipy.spatial.transform import Rotation
 
+np.set_printoptions(formatter={"float": lambda x: "{0:0.2f}".format(x)})
+
+urdf_path = "../reachy.urdf"
+robot_full = pin.RobotWrapper.BuildFromURDF(urdf_path)
+
+# lock the other joints
+tolock_in_rarm = [
+    "l_shoulder_pitch",
+    "l_shoulder_roll",
+    "l_elbow_yaw",
+    "l_elbow_pitch",
+    "l_wrist_roll",
+    "l_wrist_pitch",
+    "l_wrist_yaw",
+    "l_hand_finger",
+    "l_hand_finger_mimic",
+    # 'r_wrist_roll',
+    # 'r_wrist_pitch',
+    # 'r_wrist_yaw',
+    "r_hand_finger",
+    "r_hand_finger_mimic",
+    "neck_roll",
+    "neck_pitch",
+    "neck_yaw",
+]
+
+tolock_in_larm = [
+    "r_shoulder_pitch",
+    "r_shoulder_roll",
+    "r_elbow_yaw",
+    "r_elbow_pitch",
+    "r_wrist_roll",
+    "r_wrist_pitch",
+    "r_wrist_yaw",
+    "r_hand_finger",
+    "r_hand_finger_mimic",
+    # 'l_wrist_roll',
+    # 'l_wrist_pitch',
+    # 'l_wrist_yaw',
+    "l_hand_finger",
+    "l_hand_finger_mimic",
+    "neck_roll",
+    "neck_pitch",
+    "neck_yaw",
+]
+
+
+def pin_arm_model_data(robot_complete, tolock):
+    # Get the ID of all existing joints
+    model = robot_complete.model
+    jointsToLockIDs = []
+    for jn in tolock:
+        if model.existJointName(jn):
+            jointsToLockIDs.append(model.getJointId(jn))
+    newmodel = pin.buildReducedModel(model, jointsToLockIDs, np.zeros(21))
+    newdata = newmodel.createData()
+    return newmodel, newdata
+
+
+model_larm, data_larm = pin_arm_model_data(robot_full, tolock_in_larm)
+model_rarm, data_rarm = pin_arm_model_data(robot_full, tolock_in_rarm)
+
+
+def jacobian_frame(q, tip=None, robot=robot_full):
+    if tip is None:
+        tip = robot.model.frames[-1].name
+    joint_id = robot.model.getFrameId(tip)
+    J = pin.computeFrameJacobian(
+        robot.model, robot.data, q, joint_id, reference_frame=pin.LOCAL_WORLD_ALIGNED
+    )
+    return J
+
+
+def jacobian_joint(q, modeldata, tip):
+    [model, data] = modeldata
+    joint_id = model.getJointId(tip)
+    J = pin.computeJointJacobian(model, data, q, joint_id)
+    return J
+
+
+def svals(J):
+    u, s, v = np.linalg.svd(J)
+    return s
+
+
+def manip(J):
+    return np.sqrt(np.linalg.det(J.T @ J))
+
+
+def fk(q, modeldata, tip):
+    [model, data] = modeldata
+    # joint_id =  robot.model.getFrameId(robot.model.frames[-1].name)
+    if tip is None:
+        tip = model.frames[-1].name
+    joint_id = model.getFrameId(tip)
+    pin.framesForwardKinematics(model, data, q)
+    # pin.computeJointJacobians(robot.model, robot.data, q)
+    return data.oMf[model.getFrameId(tip)].copy()
+
 
 def inverse_kinematics(
     ik_solver, q0: np.ndarray, target_pose: np.ndarray, nb_joints: int
-) -> Tuple[float, np.ndarray]:
+):
     """Compute the inverse kinematics of the given arm.
     The function assumes the number of joints is correct!
     """
@@ -169,14 +272,16 @@ class MySymIK:
 
         # self.logger.warning(f"{name} jump in joint space")
 
-        self.ik_joints = self.allow_multiturn(self.ik_joints, self.previous_sol[name])
+        self.ik_joints, multiturn = self.allow_multiturn(
+            self.ik_joints, self.previous_sol[name]
+        )
 
         self.previous_sol[name] = self.ik_joints
         # self.logger.info(f"{name} ik={self.ik_joints}, elbow={elbow_position}")
 
         # TODO reactivate a smoothing technique
 
-        return self.ik_joints, is_reachable
+        return self.ik_joints, is_reachable, multiturn
 
     def allow_multiturn(self, new_joints, prev_joints):
         """This function will always guarantee that the joint takes the shortest path to the new position.
@@ -188,33 +293,60 @@ class MySymIK:
 
         # Temp : showing a warning if a multiturn is detected. TODO do better. This info is critical and should be saved dyamically on disk.
         indexes_that_can_multiturn = [0, 2, 6]
+        multiturn = False
         for index in indexes_that_can_multiturn:
             if abs(new_joints[index]) > np.pi:
-                print(
-                    f"Multiturn detected on joint {index} with value: {new_joints[index]} @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-                )
+                multiturn = True
+                # print(
+                #     f"Multiturn detected on joint {index} with value: {new_joints[index]} @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+                # )
                 # TEMP forbidding multiturn
                 # new_joints[index] = np.sign(new_joints[index]) * np.pi
-        return new_joints
+        return new_joints, multiturn
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("csvfile", type=str)
 args = parser.parse_args()
 
-ik = MySymIK()
 print("csvfile:", args.csvfile)
-
 csvfilebase = args.csvfile[:-4]
-outcsvfile = "{}_symik.csv".format(csvfilebase)
-print("outcsv:", outcsvfile)
+datalist = []
+pkl_fname = "{}.pkl".format(csvfilebase)
+if os.path.isfile(pkl_fname):
+    print("pkl file found, loading: {}".format(pkl_fname))
+    print("run with python -i or modify scrtipt to use the data")
+    with open(pkl_fname, "rb") as p_file:
+        datalist = pickle.load(p_file)
+        print("datalist size: {}".format(len(datalist)))
+    sys.exit(0)
 
-outcsv = open(outcsvfile, "w", newline="")
-csvw = csv.writer(outcsv, delimiter=",")
+print("pkl NOT file ({}) found, processing".format(pkl_fname))
+ik = MySymIK()
+if "l_arm" not in csvfilebase and "r_arm" not in csvfilebase:
+    print(
+        'Error: {} does not contain "l_arm" or "l_arm" in name to determine which model'.format(
+            csvfilebase
+        )
+    )
+    sys.exit(1)
 
-csvw.writerow(["q{}".format(1 + i) for i in np.arange(7)] + ["reachable"])
+# tip = 'l_elbow_ball_link' # as frame
+# tip = 'l_elbow_dummy_link'
+# tip = 'l_shoulder_ball_link'
+tip = "l_elbow_pitch"  # joint
+# tip = None
 
-print("computing output to csv...")
+arm_str = "l_arm"
+arm_model = model_larm
+arm_data = data_larm
+if "r_arm" in csvfilebase:
+    arm_str = "r_arm"
+    arm_model = model_rarm
+    arm_data = data_rarm
+    tip[:3].replace("l_", "r_")
+
+print("computing manip to csv...")
 with open(args.csvfile, newline="") as csvfile:
     i = 0
     reader = csv.DictReader(csvfile)
@@ -232,6 +364,40 @@ with open(args.csvfile, newline="") as csvfile:
             ]
         )
         # print(M)
-        q, reachable = ik.symbolic_inverse_kinematics("l_arm", M)
-        # print(q, reachable)
-        csvw.writerow([*q, reachable])
+        q, reachable, multiturn = ik.symbolic_inverse_kinematics(arm_str, M)
+
+        fkk = fk(q, modeldata=(arm_model, arm_data), tip=tip)
+        # J = jacobian_frame(q, tip=tip)[:3, :]
+        J = jacobian_joint(q, modeldata=(arm_model, arm_data), tip=tip)[:3, :]
+        manipp = manip(J)  # TODO: NOT WORKING
+        rank = np.linalg.matrix_rank(J)
+        svalues = svals(J)
+        nsvalues = 2
+
+        def print_all():
+            print("rank", rank)
+            print("multiturn:", multiturn)
+            print("q:", q)
+            print("svalues:", svalues)
+            print("manip: {:.10f}".format(manipp))
+            print(fkk)
+            print(J)
+
+        should_save = False
+        # should_save |= multiturn
+        should_save |= not reachable
+
+        if should_save:
+            datalist.append(
+                types.SimpleNamespace(
+                    q_symik=q,
+                    M_teleop=M,
+                    reachable_symik=reachable,
+                    multiturn_symik=multiturn,
+                )
+            )
+
+print("saving results to pkl file ({})".format(pkl_fname))
+print("datalist size: {}".format(len(datalist)))
+with open(pkl_fname, "wb") as p_file:
+    pickle.dump(datalist, p_file)

@@ -8,7 +8,7 @@ $ ls subset5
 metadata.yaml  subset5_0.db3
 
 # get the poses output per arm
-$ ./bagtocsv.sh subset5
+$ ./bagdir_to_csv.py subset5
 $ ls subset5
 l_arm_target_pose.csv  metadata.yaml  r_arm_target_pose.csv  subset5_0.db3
 

@@ -9,36 +9,39 @@ import csv
 import sys
 
 from reachy2_symbolic_ik.symbolic_ik import SymbolicIK
-from reachy2_symbolic_ik.utils import (angle_diff, get_best_continuous_theta,
-                                       limit_theta_to_interval,
-                                       tend_to_prefered_theta)
+from reachy2_symbolic_ik.utils import (
+    angle_diff,
+    get_best_continuous_theta,
+    limit_theta_to_interval,
+    tend_to_prefered_theta,
+)
 
 from scipy.spatial.transform import Rotation
 
-np.set_printoptions(formatter={'float': lambda x: "{0:0.2f}".format(x)})
+np.set_printoptions(formatter={"float": lambda x: "{0:0.2f}".format(x)})
 
-urdf_path = '../reachy.urdf'
+urdf_path = "../reachy.urdf"
 robot = pin.RobotWrapper.BuildFromURDF(urdf_path)
 model, data = robot.model, robot.data
 # lock the other joints
 tolock = [
-    'l_shoulder_pitch',
-    'l_shoulder_roll',
-    'l_elbow_yaw',
-    'l_elbow_pitch',
-    'l_wrist_roll',
-    'l_wrist_pitch',
-    'l_wrist_yaw',
-    'l_hand_finger',
-    'l_hand_finger_mimic',
+    "l_shoulder_pitch",
+    "l_shoulder_roll",
+    "l_elbow_yaw",
+    "l_elbow_pitch",
+    "l_wrist_roll",
+    "l_wrist_pitch",
+    "l_wrist_yaw",
+    "l_hand_finger",
+    "l_hand_finger_mimic",
     # 'r_wrist_roll',
     # 'r_wrist_pitch',
     # 'r_wrist_yaw',
-    'r_hand_finger',
-    'r_hand_finger_mimic',
-    'neck_roll',
-    'neck_pitch',
-    'neck_yaw',
+    "r_hand_finger",
+    "r_hand_finger_mimic",
+    "neck_roll",
+    "neck_pitch",
+    "neck_yaw",
 ]
 
 # tolock = [
@@ -74,20 +77,15 @@ def jacobian_frame(q, tip=None, robot=robot):
     if tip is None:
         tip = robot.model.frames[-1].name
     joint_id = robot.model.getFrameId(tip)
-    J = pin.computeFrameJacobian(robot.model,
-                                 robot.data,
-                                 q,
-                                 joint_id,
-                                 reference_frame=pin.LOCAL_WORLD_ALIGNED)
+    J = pin.computeFrameJacobian(
+        robot.model, robot.data, q, joint_id, reference_frame=pin.LOCAL_WORLD_ALIGNED
+    )
     return J
 
 
 def jacobian_joint(q, tip=None, robot=robot):
     joint_id = robot.model.getJointId(tip)
-    J = pin.computeJointJacobian(robot.model,
-                                 robot.data,
-                                 q,
-                                 joint_id)
+    J = pin.computeJointJacobian(robot.model, robot.data, q, joint_id)
     return J
 
 
@@ -95,8 +93,9 @@ def svals(J):
     u, s, v = np.linalg.svd(J)
     return s
 
+
 def manip(J):
-    return np.sqrt(np.linalg.det(J.T@J))
+    return np.sqrt(np.linalg.det(J.T @ J))
 
 
 def fk(q, tip=None, robot=robot):
@@ -109,8 +108,9 @@ def fk(q, tip=None, robot=robot):
     return robot.data.oMf[robot.model.getFrameId(tip)].copy()
 
 
-def inverse_kinematics(ik_solver, q0: np.ndarray, target_pose: np.ndarray,
-                       nb_joints: int) -> Tuple[float, np.ndarray]:
+def inverse_kinematics(
+    ik_solver, q0: np.ndarray, target_pose: np.ndarray, nb_joints: int
+) -> Tuple[float, np.ndarray]:
     """Compute the inverse kinematics of the given arm.
     The function assumes the number of joints is correct!
     """
@@ -132,12 +132,12 @@ def inverse_kinematics(ik_solver, q0: np.ndarray, target_pose: np.ndarray,
     return res, sol
 
 
-def get_euler_from_homogeneous_matrix(homogeneous_matrix,
-                                      degrees: bool = False):
+def get_euler_from_homogeneous_matrix(homogeneous_matrix, degrees: bool = False):
     position = homogeneous_matrix[:3, 3]
     rotation_matrix = homogeneous_matrix[:3, :3]
     euler_angles = Rotation.from_matrix(rotation_matrix).as_euler(
-        "xyz", degrees=degrees)
+        "xyz", degrees=degrees
+    )
     return position, euler_angles
 
 
@@ -149,7 +149,7 @@ class MySymIK:
         self.previous_sol = {}
         self.prefered_theta = -4 * np.pi / 6  # 5 * np.pi / 4  # np.pi / 4
 
-        for arm in ['l_arm', 'r_arm']:
+        for arm in ["l_arm", "r_arm"]:
             self.previous_theta[arm] = None
             self.previous_sol[arm] = None
             self.symbolic_ik_solver[arm] = SymbolicIK(
@@ -175,9 +175,7 @@ class MySymIK:
             prefered_theta = -np.pi - self.prefered_theta
 
         if name.startswith("l"):
-            interval_limit = [
-                -np.pi - interval_limit[1], -np.pi - interval_limit[0]
-            ]
+            interval_limit = [-np.pi - interval_limit[1], -np.pi - interval_limit[0]]
 
         if self.previous_theta[name] is None:
             self.previous_theta[name] = prefered_theta
@@ -196,7 +194,8 @@ class MySymIK:
         goal_pose = np.array([goal_position, goal_orientation])
 
         is_reachable, interval, theta_to_joints_func = self.symbolic_ik_solver[
-            name].is_reachable(goal_pose)
+            name
+        ].is_reachable(goal_pose)
         if is_reachable:
             is_reachable, theta, state = get_best_continuous_theta(
                 self.previous_theta[name],
@@ -206,24 +205,27 @@ class MySymIK:
                 prefered_theta,
                 self.symbolic_ik_solver[name].arm,
             )
-            #self.logger.warning(
+            # self.logger.warning(
             #    f"name: {name}, theta: {theta}")
-            theta = limit_theta_to_interval(theta, self.previous_theta[name],
-                                            interval_limit)
-            #self.logger.warning(
+            theta = limit_theta_to_interval(
+                theta, self.previous_theta[name], interval_limit
+            )
+            # self.logger.warning(
             #    f"name: {name}, theta: {theta}, previous_theta: {self.previous_theta[name]}, state: {state}"
-            #)
+            # )
             self.previous_theta[name] = theta
             self.ik_joints, elbow_position = theta_to_joints_func(
-                theta, previous_joints=self.previous_sol[name])
-            #self.logger.warning(
+                theta, previous_joints=self.previous_sol[name]
+            )
+            # self.logger.warning(
             #    f"{name} Is reachable. Is truly reachable: {is_reachable}. State: {state}"
-            #)
+            # )
 
         else:
-            #self.logger.warning(f"{name} Pose not reachable but doing our best")
+            # self.logger.warning(f"{name} Pose not reachable but doing our best")
             is_reachable, interval, theta_to_joints_func = self.symbolic_ik_solver[
-                name].is_reachable_no_limits(goal_pose)
+                name
+            ].is_reachable_no_limits(goal_pose)
             if is_reachable:
                 is_reachable, theta = tend_to_prefered_theta(
                     self.previous_theta[name],
@@ -232,15 +234,16 @@ class MySymIK:
                     d_theta_max,
                     goal_theta=prefered_theta,
                 )
-                theta = limit_theta_to_interval(theta,
-                                                self.previous_theta[name],
-                                                interval_limit)
-                #self.logger.warning(
+                theta = limit_theta_to_interval(
+                    theta, self.previous_theta[name], interval_limit
+                )
+                # self.logger.warning(
                 #    f"name: {name}, theta: {theta}, previous_theta: {self.previous_theta[name]}"
-                #)
+                # )
                 self.previous_theta[name] = theta
                 self.ik_joints, elbow_position = theta_to_joints_func(
-                    theta, previous_joints=self.previous_sol[name])
+                    theta, previous_joints=self.previous_sol[name]
+                )
             else:
                 print(
                     f"{name} Pose not reachable, this has to be fixed by projecting far poses to reachable sphere"
@@ -257,7 +260,8 @@ class MySymIK:
         # self.logger.warning(f"{name} jump in joint space")
 
         self.ik_joints, multiturn = self.allow_multiturn(
-            self.ik_joints, self.previous_sol[name])
+            self.ik_joints, self.previous_sol[name]
+        )
 
         self.previous_sol[name] = self.ik_joints
         # self.logger.info(f"{name} ik={self.ik_joints}, elbow={elbow_position}")
@@ -284,75 +288,77 @@ class MySymIK:
                 #     f"Multiturn detected on joint {index} with value: {new_joints[index]} @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
                 # )
                 # TEMP forbidding multiturn
-                #new_joints[index] = np.sign(new_joints[index]) * np.pi
+                # new_joints[index] = np.sign(new_joints[index]) * np.pi
         return new_joints, multiturn
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('csvfile', type=str)
+parser.add_argument("csvfile", type=str)
 args = parser.parse_args()
 
 ik = MySymIK()
-print('csvfile:', args.csvfile)
+print("csvfile:", args.csvfile)
 
 csvfilebase = args.csvfile[:-4]
-outcsvfile = '{}_symik.csv'.format(csvfilebase)
+outcsvfile = "{}_symik.csv".format(csvfilebase)
 
-print('computing manip to csv...')
-with open(args.csvfile, newline='') as csvfile:
+print("computing manip to csv...")
+with open(args.csvfile, newline="") as csvfile:
     i = 0
     reader = csv.DictReader(csvfile)
     for row in reader:
         i += 1
         # (x, y, z, w)
-        R = Rotation.from_quat(
-            [row['or_x'], row['or_y'], row['or_z'], row['or_w']])
+        R = Rotation.from_quat([row["or_x"], row["or_y"], row["or_z"], row["or_w"]])
         M = np.eye(4)
         M[:3, :3] = R.as_matrix()
-        M[:3, 3] = np.array([
-            row['pos_x'],
-            row['pos_y'],
-            row['pos_z'],
-        ])
+        M[:3, 3] = np.array(
+            [
+                row["pos_x"],
+                row["pos_y"],
+                row["pos_z"],
+            ]
+        )
         # print(M)
-        q, reachable, multiturn = ik.symbolic_inverse_kinematics('l_arm', M)
+        q, reachable, multiturn = ik.symbolic_inverse_kinematics("l_arm", M)
 
         # tip = 'r_elbow_ball_link' # as frame
         # tip = 'r_elbow_dummy_link'
         # tip = 'r_shoulder_ball_link'
-        tip = 'r_elbow_pitch'  # joint
+        tip = "r_elbow_pitch"  # joint
         # tip = None
         fkk = fk(q, tip=tip)
         # J = jacobian_frame(q, tip=tip)[:3, :]
         J = jacobian_joint(q, tip=tip)[:3, :]
-        manipp = manip(J) # TODO: NOT WORKING
+        manipp = manip(J)  # TODO: NOT WORKING
         rank = np.linalg.matrix_rank(J)
         svalues = svals(J)
         nsvalues = 2
+
         # if manipp > 0.1:
         #     print_all()
         #     sys.exit(0)
 
         def print_all():
-            print('rank', rank)
-            print('multiturn:', multiturn)
-            print('q:', q)
-            print('svalues:', svalues)
-            print('manip: {:.10f}'.format(manipp))
+            print("rank", rank)
+            print("multiturn:", multiturn)
+            print("q:", q)
+            print("svalues:", svalues)
+            print("manip: {:.10f}".format(manipp))
             print(fkk)
             print(J)
 
         if np.min(svalues[:nsvalues]) < 0.22:
-            print('-------------')
-            print('svalues LOWW i:', i)
+            print("-------------")
+            print("svalues LOWW i:", i)
             print_all()
 
         if rank != nsvalues:
-            print('------------------')
-            print('rank != J.shape[0] i:', i)
+            print("------------------")
+            print("rank != J.shape[0] i:", i)
             print_all()
 
         if multiturn:
-            print('-------------')
-            print('multiturn detected!, i:', i)
+            print("-------------")
+            print("multiturn detected!, i:", i)
             print_all()
