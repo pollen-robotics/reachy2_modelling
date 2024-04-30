@@ -37,5 +37,9 @@ subset2/l_arm_target_pose.csv       subset6/l_arm_target_pose.csv
 subset2/r_arm_target_pose.csv       subset6/r_arm_target_pose.csv
 subset3/l_arm_target_pose.csv       subset/l_arm_target_pose.csv
 subset3/r_arm_target_pose.csv       subset/r_arm_target_pose.csv
+
+# combined for a single csv file per arm
+$ ls *_combined.csv
+l_arm_combined.csv  r_arm_combined.csv
 ```
 
