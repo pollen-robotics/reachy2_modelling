@@ -3,11 +3,11 @@ set -xe
 
 rm -vf */*.csv
 
-./bagtocsv.sh subset
-./bagtocsv.sh subset2
-./bagtocsv.sh subset3
-./bagtocsv.sh subset5
-./bagtocsv.sh subset6
+./bagdir_to_csv.py subset
+./bagdir_to_csv.py subset2
+./bagdir_to_csv.py subset3
+./bagdir_to_csv.py subset5
+./bagdir_to_csv.py subset6
 
 dirpath="centrage_l_r/reachy.bag/"
 if [ -d ${dirpath} ]; then
@@ -15,7 +15,7 @@ if [ -d ${dirpath} ]; then
     mv -v ${dirpath}/* centrage_l_r/
     rmdir ${dirpath}
 fi
-./bagtocsv.sh centrage_l_r/
+./bagdir_to_csv.py centrage_l_r/
 
 
 wc -l */*.csv

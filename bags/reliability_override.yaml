@@ -1,0 +1,7 @@
+# reliability_override.yaml
+/l_arm/target_pose:
+  reliability: reliable
+  history: keep_all
+/r_arm/target_pose:
+  reliability: reliable
+  history: keep_all

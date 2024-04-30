@@ -21,8 +21,10 @@ class MySubscriber(Node):
     def __init__(self, topic, outfile):
         super().__init__("my_subscriber")
         qos_profile = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
-            history=HistoryPolicy.KEEP_LAST,
+            # reliability=ReliabilityPolicy.BEST_EFFORT,
+            # history=HistoryPolicy.KEEP_LAST,
+            reliability=ReliabilityPolicy.RELIABLE,
+            history=HistoryPolicy.KEEP_ALL,
             depth=10,
         )
         self.subscription = self.create_subscription(
