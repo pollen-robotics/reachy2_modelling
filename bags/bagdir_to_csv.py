@@ -63,15 +63,19 @@ print("count lines...")
 cmd = f"wc -l {larmf} {rarmf}"
 print(subprocess.check_output(cmd, shell=True).rstrip().decode("utf-8"))
 
-sqlcmd="SELECT topics.id, topics.name, count(messages.topic_id) from topics, messages where messages.topic_id=topics.id group by topics.name;"
+sqlcmd = "SELECT topics.id, topics.name, count(messages.topic_id) from topics, messages where messages.topic_id=topics.id group by topics.name;"
 try:
-    subprocess.check_call(['which', 'sqlite3'])
+    subprocess.check_call(["which", "sqlite3"])
 except subprocess.CalledProcessError:
     print("sqlite3 not found, can't verify rosbag size")
     exit(0)
 
 dirr = args.bagdir
-dbs = [fname for fname in os.listdir(dirr) if os.path.isfile(os.path.join(dirr, fname)) and fname.endswith(".db3")]
+dbs = [
+    fname
+    for fname in os.listdir(dirr)
+    if os.path.isfile(os.path.join(dirr, fname)) and fname.endswith(".db3")
+]
 if len(dbs) > 1:
     print("Error: multiple dbs found in bagdir?:", dbs)
     exit(1)
@@ -79,14 +83,16 @@ if len(dbs) > 1:
 cmd = f"sqlite3 {args.bagdir}/{dbs[0]} '{sqlcmd}'"
 # print(cmd)
 rawstr = subprocess.check_output(cmd, shell=True).strip().decode("utf-8")
-larm_inline = ['l_arm' in line for line in rawstr.split("\n")]
+larm_inline = ["l_arm" in line for line in rawstr.split("\n")]
 linecount_pertopic = [int(line.split("|")[-1]) for line in rawstr.split("\n")]
-assert(len(larm_inline) == len(linecount_pertopic))
+assert len(larm_inline) == len(linecount_pertopic)
 
 for larm_flag, count in zip(larm_inline, linecount_pertopic):
     armf = larmf if larm_flag else rarmf
-    result = flines(armf)-1 # -1 from header
+    result = flines(armf) - 1  # -1 from header
     if result != count:
-        print(f"Warning: {'l_arm' if larm_flag else 'r_arm'} count is wrong, it is {result} instead of {count}")
+        print(
+            f"Warning: {'l_arm' if larm_flag else 'r_arm'} count is wrong, it is {result} instead of {count}"
+        )
     else:
         print(f"{'l_arm' if larm_flag else 'r_arm'} count is OK {result} = {count}")

@@ -9,12 +9,12 @@ from geometry_msgs.msg import PoseStamped
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 
-HEADER = (
-    "stamp_sec,stamp_nanosec,stamp_frame_id,pos_x,pos_y,pos_z,or_x,or_y,or_z,or_w"
-)
+HEADER = "stamp_sec,stamp_nanosec,stamp_frame_id,pos_x,pos_y,pos_z,or_x,or_y,or_z,or_w"
+
 
 def tofile(text, fpath):
     subprocess.check_call(f"echo '{text}' >> '{fpath}'", shell=True)
+
 
 class MySubscriber(Node):
 
@@ -42,7 +42,6 @@ class MySubscriber(Node):
             wf.write(msg + "\n")
             wf.flush()
         # tofile(msg, self.outfile)
-
 
     def listener_callback(self, msg):
         header = msg.header

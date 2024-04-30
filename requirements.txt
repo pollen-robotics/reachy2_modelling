@@ -1,10 +1,8 @@
-pycapacity
+jupyter
+pin
+example-robot-data
 meshcat
 ipywidgets
 ipympl
-pin
-jupyter
-example-robot-data
-pin-pink
 roboticstoolbox-python
-pandas
+black
