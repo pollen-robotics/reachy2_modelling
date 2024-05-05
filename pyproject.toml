@@ -1,0 +1,29 @@
+[project]
+name = "reachy2_modelling"
+version = "0.1"
+dynamic = ["dependencies"]
+[tool.setuptools]
+# # package-dir = {"" = "reachy2_modelling"}
+package-dir = {"" = "src"}
+# # py-modules = ["reachy2_modelling"]
+# packages = ["reachy2_modelling"]
+# [tool.setuptools.packages.find]
+# where = ["src"]
+# [tool.setuptools.packages.find]
+# where = ["reachy2_modelling"]
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+# [tool.setuptools.packages]
+# find = {}  # Scan the project directory with the default parameters
+# [tool.setuptools.packages.find]
+# where = ["models"]  # list of folders that contain the packages (["."] by default)
+# include = ["*"]  # package names should match these glob patterns (["*"] by default)
+# exclude = ["tests", "bags"] # exclude packages matching these glob patterns (empty by default)
+# namespaces = false  # to disable scanning PEP 420 namespaces (true by default)
+# [build-system]
+# requires = ["setuptools"]
+# build-backend = "setuptools.build_meta"
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["*"]  # alternatively: `exclude = ["additional*"]`
+# namespaces = false

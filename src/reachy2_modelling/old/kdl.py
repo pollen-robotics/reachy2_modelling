@@ -1,7 +1,7 @@
 import numpy as np
 import PyKDL as kdl
 
-from kdl_parser_py import urdf
+from ..kdl_parser_py import urdf
 
 import sys
 from pathlib import Path

@@ -3,12 +3,17 @@ import pinocchio as pin
 import PyKDL as kdl
 from example_robot_data import load
 
-import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).parent.parent / "models"))
+try:
+    import reachy2_modelling
+    from reachy2_modelling.kdl_parser_py import urdf
+except ImportError as e:
+    print("Error:", e)
+    print("is reachy2_modelling installed? run in root directory:")
+    print("pip install -e .")
+    exit(1)
 
-from kdl_parser_py import urdf
 
 np.set_printoptions(formatter={"float": lambda x: "{0:0.2f}".format(x)})
 
@@ -67,7 +72,7 @@ def generate_solver(
 
 
 # the file in this repo was extracted from example_robot_data
-panda_path = str(Path(__file__).parent.parent / "models" / "panda.urdf")
+panda_path = str(Path(reachy2_modelling.__file__).parent / "panda.urdf")
 # robot = pin.RobotWrapper.BuildFromURDF(panda_path)
 robot = load("panda")
 model, data = robot.model, robot.data

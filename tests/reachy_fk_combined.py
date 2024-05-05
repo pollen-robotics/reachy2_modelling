@@ -2,14 +2,15 @@ import numpy as np
 import pinocchio as pin
 import PyKDL as kdl
 
-import sys
-from pathlib import Path
-
-sys.path.append(str(Path(__file__).parent.parent / "models"))
-
-import reachy_kdl as rk
-import reachy_pinocchio as rp
-import reachy_rtb as rr
+try:
+    import reachy2_modelling.old.kdl as rk
+    import reachy2_modelling.old.pin as rp
+    import reachy2_modelling.old.rtb as rr
+except ImportError as e:
+    print("Error:", e)
+    print("is reachy2_modelling installed? run in root directory:")
+    print("pip install -e .")
+    exit(1)
 
 np.set_printoptions(formatter={"float": lambda x: "{0:0.2f}".format(x)})
 
