@@ -1,12 +1,11 @@
 import itertools
-from scipy.spatial import ConvexHull
-import pycapacity
-import pycapacity.algorithms as algos
 
 import numpy as np
 import numpy.matlib
-
 import pinocchio as pin
+import pycapacity
+import pycapacity.algorithms as algos
+from scipy.spatial import ConvexHull
 
 
 # direct kinematics functions using pinocchio
@@ -38,8 +37,8 @@ def dk_position(robot, q, frame_name=None):
 
 from CGAL.CGAL_Alpha_wrap_3 import *
 from CGAL.CGAL_Kernel import *
-from CGAL.CGAL_Polyhedron_3 import Polyhedron_3
 from CGAL.CGAL_Mesh_3 import *
+from CGAL.CGAL_Polyhedron_3 import Polyhedron_3
 
 
 def alpha_shape_with_cgal(coords, alpha=None):

@@ -1,9 +1,9 @@
-import string
-import yaml
 import collections
-
-from xml.etree import ElementTree as ET
+import string
 from xml.dom import minidom
+from xml.etree import ElementTree as ET
+
+import yaml
 
 
 def xml_string(rootXml, addHeader=True):

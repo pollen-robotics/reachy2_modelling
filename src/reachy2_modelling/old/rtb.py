@@ -1,11 +1,9 @@
-import sys
-
-import numpy as np
-import roboticstoolbox as rtb
-
 # general_robotics_toolbox.urdf.robot_from_xml_string
 import sys
 from pathlib import Path
+
+import numpy as np
+import roboticstoolbox as rtb
 
 urdf_path = str(Path(__file__).parent / "reachy.urdf")
 

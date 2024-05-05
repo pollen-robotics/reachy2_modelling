@@ -1,10 +1,10 @@
+import sys
+from pathlib import Path
+
 import numpy as np
 import PyKDL as kdl
 
 from ..kdl_parser_py import urdf
-
-import sys
-from pathlib import Path
 
 urdf_path = str(Path(__file__).parent / "reachy.urdf")
 

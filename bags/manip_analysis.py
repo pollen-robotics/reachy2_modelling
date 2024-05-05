@@ -1,21 +1,17 @@
 #!/usr/bin/env python3
 
-import pinocchio as pin
-from typing import Tuple
 import argparse
-import numpy as np
-import PyKDL as kdl
 import csv
 import sys
+from typing import Tuple
 
+import numpy as np
+import pinocchio as pin
+import PyKDL as kdl
 from reachy2_symbolic_ik.symbolic_ik import SymbolicIK
-from reachy2_symbolic_ik.utils import (
-    angle_diff,
-    get_best_continuous_theta,
-    limit_theta_to_interval,
-    tend_to_prefered_theta,
-)
-
+from reachy2_symbolic_ik.utils import (angle_diff, get_best_continuous_theta,
+                                       limit_theta_to_interval,
+                                       tend_to_prefered_theta)
 from scipy.spatial.transform import Rotation
 
 np.set_printoptions(formatter={"float": lambda x: "{0:0.2f}".format(x)})

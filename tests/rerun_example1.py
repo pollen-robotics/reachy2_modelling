@@ -1,5 +1,5 @@
-import rerun as rr  # NOTE: `rerun`, not `rerun-sdk`!
 import numpy as np
+import rerun as rr  # NOTE: `rerun`, not `rerun-sdk`!
 
 rr.init("rerun_example_my_data", spawn=True)
 

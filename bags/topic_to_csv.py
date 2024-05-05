@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-import subprocess
 import argparse
-import rclpy
-from rclpy.node import Node
-from std_msgs.msg import String
-from geometry_msgs.msg import PoseStamped
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+import subprocess
 
+import rclpy
+from geometry_msgs.msg import PoseStamped
+from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+from std_msgs.msg import String
 
 HEADER = "stamp_sec,stamp_nanosec,stamp_frame_id,pos_x,pos_y,pos_z,or_x,or_y,or_z,or_w"
 

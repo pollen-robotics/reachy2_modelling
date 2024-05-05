@@ -1,12 +1,8 @@
-import sys
 import copy
-
-from .basics import node_add
-from .basics import xml_children
-from .basics import xml_string
-from .basics import YamlReflection
+import sys
 from xml.etree import ElementTree as ET
 
+from .basics import YamlReflection, node_add, xml_children, xml_string
 
 ros2_control_warning_done = False
 

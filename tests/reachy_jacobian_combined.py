@@ -1,8 +1,8 @@
-import numpy as np
-import pinocchio as pin
-
 import sys
 from pathlib import Path
+
+import numpy as np
+import pinocchio as pin
 
 sys.path.append(str(Path(__file__).parent.parent / "models"))
 

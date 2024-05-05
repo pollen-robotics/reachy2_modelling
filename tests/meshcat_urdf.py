@@ -1,18 +1,16 @@
-import pinocchio as pin
-import numpy as np
 import time
-import scipy
 from copy import copy
-from example_robot_data import load
-
-## visualise the robot
-from pinocchio.visualize import MeshcatVisualizer
 
 ## visualise the polytope and the ellipsoid
 import meshcat.geometry as g
-
+import numpy as np
+import pinocchio as pin
 # import pycapacity
 import pycapacity as pycap
+import scipy
+from example_robot_data import load
+## visualise the robot
+from pinocchio.visualize import MeshcatVisualizer
 
 try:
     import reachy2_modelling.old.pin as rp

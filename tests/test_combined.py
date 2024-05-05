@@ -1,9 +1,9 @@
+from pathlib import Path
+
 import numpy as np
 import pinocchio as pin
 import PyKDL as kdl
 from example_robot_data import load
-
-from pathlib import Path
 
 try:
     import reachy2_modelling
