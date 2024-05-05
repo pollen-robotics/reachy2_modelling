@@ -5,6 +5,7 @@ meshcat
 ipywidgets
 ipympl
 roboticstoolbox-python
-black
 pycapacity
 scipy<=1.11 # remove after roboticstoolbox-python fixes #412
+black
+isort
