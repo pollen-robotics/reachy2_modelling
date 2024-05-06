@@ -110,6 +110,9 @@ class URDFLogger:
         )
 
     def log_link(self, entity_path: str, link: urdf_parser.Link) -> None:
+        # TODO: hack to avoid weird thing in wrist
+        if "wrist_base_link" in link.name:
+            return
         # create one mesh out of all visuals
         for i, visual in enumerate(link.visuals):
             self.log_visual(entity_path + f"/visual_{i}", visual)

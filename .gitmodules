@@ -1,0 +1,3 @@
+[submodule "src/reachy2_modelling/reachy2_rerun_test"]
+	path = src/reachy2_modelling/reachy2_rerun_test
+	url = git@github.com:pollen-robotics/reachy2_rerun_test.git
