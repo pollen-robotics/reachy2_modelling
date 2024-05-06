@@ -300,8 +300,14 @@ def teleop_blueprint():
             name="teleop_position",
         ),
         Horizontal(
-            TimeSeriesView(origin=arm_entity("l_arm", "ik")),
-            TimeSeriesView(origin=arm_entity("r_arm", "ik")),
+            Vertical(
+                TimeSeriesView(origin=arm_entity("l_arm", "ik/reachable")),
+                TimeSeriesView(origin=arm_entity("l_arm", "ik/multiturn")),
+            ),
+            Vertical(
+                TimeSeriesView(origin=arm_entity("r_arm", "ik/reachable")),
+                TimeSeriesView(origin=arm_entity("r_arm", "ik/multiturn")),
+            ),
             name="IK Stats",
         ),
         active_tab=1,
@@ -337,11 +343,30 @@ def debug_tab():
             name="linear manipulability",
         ),
         Horizontal(
-            TimeSeriesView(origin=arm_qd_entity("l_arm", 2)),
-            TimeSeriesView(origin=arm_qd_entity("r_arm", 2)),
+            Vertical(
+                TimeSeriesView(
+                    origin=arm_entity("l_arm", ""),
+                    contents=[f"$origin/qd{i}" for i in range(2)],
+                ),
+                TimeSeriesView(
+                    origin=arm_entity("l_arm", ""),
+                    contents=[f"$origin/qd{i+2}" for i in range(2)],
+                ),
+            ),
+            Vertical(
+                TimeSeriesView(
+                    origin=arm_entity("r_arm", ""),
+                    contents=[f"$origin/qd{i}" for i in range(2)],
+                ),
+                TimeSeriesView(
+                    origin=arm_entity("r_arm", ""),
+                    contents=[f"$origin/qd{i+2}" for i in range(2)],
+                ),
+            ),
             name="Qd2",
         ),
         name="debug",
+        row_shares=[1, 1, 2],
     )
 
 
