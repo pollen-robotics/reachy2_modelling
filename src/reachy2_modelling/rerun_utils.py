@@ -158,6 +158,16 @@ class ArmHandler:
         model, data = self.modeldata()
         return rp.fk(model, data, q, tip, world)
 
+    def jacobian(self, q, tip=None):
+        if tip is None:
+            tip = self.tip
+        model, data = self.modeldata()
+        return rp.jacobian_frame(model, data, q, tip)
+
+    def manip(self, q, tip):
+        J = self.jacobian(q, tip)
+        return rp.manip(J)
+
     def log(self, epoch_s, ik, M, urdf_logger):
         if M is not None:
             q, reachable, multiturn = ik.symbolic_inverse_kinematics(self.name, M)
@@ -174,15 +184,26 @@ class ArmHandler:
             self.prev_q = q
             self.prev_epoch_s = epoch_s
 
+            # manipulability
+            for dof in [2, 4, 7]:
+                tip = self.joints[dof - 1]
+                rr.log(
+                    arm_entity(self.name, f"manip/{dof}dof"),
+                    rr.Scalar(self.manip(q, tip)),
+                )
+
+            # fk to compute error
             Mcur = self.fk(q)
             trans, R = Mcur.translation, Mcur.rotation
             for i, coord in enumerate(["x", "y", "z"]):
                 entity = teleop_arm_entity(self.name, f"state_{coord}")
                 rr.log(entity, rr.Scalar(trans[i]))
 
+            # sym ik stats
             rr.log(arm_entity(self.name, "reachable"), rr.Scalar(reachable))
             rr.log(arm_entity(self.name, "multiturn"), rr.Scalar(multiturn))
 
+            # joint states
             for j, ang in enumerate(q):
                 rr.log(arm_q_entity(self.name, j), rr.Scalar(ang))
             for j, vel in enumerate(qd):
@@ -298,6 +319,23 @@ def arm_joints_tab(name):
     )
 
 
+def debug_tab():
+
+    return Vertical(
+        Horizontal(
+            TimeSeriesView(origin=arm_entity("l_arm", f"manip/")),
+            TimeSeriesView(origin=arm_entity("r_arm", f"manip/")),
+            name="manipulability",
+        ),
+        Horizontal(
+            TimeSeriesView(origin=arm_qd_entity("l_arm", 2)),
+            TimeSeriesView(origin=arm_qd_entity("r_arm", 2)),
+            name="Qd2",
+        ),
+        name="debug",
+    )
+
+
 def blueprint():
     return Blueprint(
         Horizontal(
@@ -310,8 +348,8 @@ def blueprint():
                 Tabs(
                     arm_joints_tab("l_arm"),
                     arm_joints_tab("r_arm"),
-                    # TimeSeriesView(origin="/reward"),
-                    active_tab=0,
+                    debug_tab(),
+                    active_tab=1,
                 ),
             ),
             column_shares=[1.3, 2],

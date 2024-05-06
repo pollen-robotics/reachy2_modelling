@@ -36,15 +36,11 @@ data = model.createData()
 # model, data = robot.model, robot.data
 
 
-def jacobian_frame(q, modeldata, tip=None):
-    [model, data] = modeldata
-    if tip is None:
-        tip = model.frames[-1].name
+def jacobian_frame(model, data, q, tip=None):
     joint_id = model.getFrameId(tip)
-    J = pin.computeFrameJacobian(
+    return pin.computeFrameJacobian(
         model, data, q, joint_id, reference_frame=pin.LOCAL_WORLD_ALIGNED
     )
-    return J
 
 
 def jacobian_joint(q, modeldata, tip):
