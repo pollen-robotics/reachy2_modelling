@@ -15,50 +15,20 @@ from reachy2_symbolic_ik.utils import (
 )
 from scipy.spatial.transform import Rotation
 
-from .pin import model_l_arm, model_r_arm
+from .pin import (
+    fk,
+    jacobian_frame,
+    jacobian_joint,
+    manip,
+    model_l_arm,
+    model_r_arm,
+    svals,
+)
 
 np.set_printoptions(formatter={"float": lambda x: "{0:0.2f}".format(x)})
 
 model_larm, model_rarm = model_l_arm, model_r_arm
 data_larm, data_rarm = model_larm.createData(), model_rarm.createData()
-
-
-def jacobian_frame(q, modeldata, tip=None):
-    [model, data] = modeldata
-    if tip is None:
-        tip = model.frames[-1].name
-    joint_id = model.getFrameId(tip)
-    J = pin.computeFrameJacobian(
-        model, data, q, joint_id, reference_frame=pin.LOCAL_WORLD_ALIGNED
-    )
-    return J
-
-
-def jacobian_joint(q, modeldata, tip):
-    [model, data] = modeldata
-    joint_id = model.getJointId(tip)
-    J = pin.computeJointJacobian(model, data, q, joint_id)
-    return J
-
-
-def svals(J):
-    u, s, v = np.linalg.svd(J)
-    return s
-
-
-def manip(J):
-    return np.sqrt(np.linalg.det(J.T @ J))
-
-
-def fk(q, modeldata, tip):
-    [model, data] = modeldata
-    # joint_id =  robot.model.getFrameId(robot.model.frames[-1].name)
-    if tip is None:
-        tip = model.frames[-1].name
-    joint_id = model.getFrameId(tip)
-    pin.framesForwardKinematics(model, data, q)
-    # pin.computeJointJacobians(robot.model, robot.data, q)
-    return data.oMf[model.getFrameId(tip)].copy()
 
 
 def inverse_kinematics(

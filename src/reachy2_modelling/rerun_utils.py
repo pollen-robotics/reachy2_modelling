@@ -16,28 +16,8 @@ from rerun.blueprint import (
     Vertical,
 )
 
-from .symik import *
-
-# ┌─────┬──────────────────────┬───────┬──────────────────────┬───────────────────────────────────────────────────┐
-# │link │         link         │ joint │        parent        │                ETS: parent to link                │
-# ├─────┼──────────────────────┼───────┼──────────────────────┼───────────────────────────────────────────────────┤
-# │   0 │ panda_link0          │       │ BASE                 │ SE3()                                             │
-# │   1 │ @panda_link0_sc      │       │ panda_link0          │ SE3()                                             │
-# │   2 │ panda_link1          │     0 │ panda_link0          │ SE3(0, 0, 0.333) ⊕ Rz(q0)                         │
-# │   3 │ @panda_link1_sc      │       │ panda_link1          │ SE3()                                             │
-# │   4 │ panda_link2          │     1 │ panda_link1          │ SE3(-90°, -0°, 0°) ⊕ Rz(q1)                       │
-# │   5 │ @panda_link2_sc      │       │ panda_link2          │ SE3()                                             │
-# │   6 │ panda_link3          │     2 │ panda_link2          │ SE3(0, -0.316, 0; 90°, -0°, 0°) ⊕ Rz(q2)          │
-# │   7 │ @panda_link3_sc      │       │ panda_link3          │ SE3()                                             │
-# │   8 │ panda_link4          │     3 │ panda_link3          │ SE3(0.0825, 0, 0; 90°, -0°, 0°) ⊕ Rz(q3)          │
-# │   9 │ @panda_link4_sc      │       │ panda_link4          │ SE3()                                             │
-# │  10 │ panda_link5          │     4 │ panda_link4          │ SE3(-0.0825, 0.384, 0; -90°, -0°, 0°) ⊕ Rz(q4)    │
-# │  11 │ @panda_link5_sc      │       │ panda_link5          │ SE3()                                             │
-# │  12 │ panda_link6          │     5 │ panda_link5          │ SE3(90°, -0°, 0°) ⊕ Rz(q5)                        │
-# │  13 │ @panda_link6_sc      │       │ panda_link6          │ SE3()                                             │
-# │  14 │ panda_link7          │     6 │ panda_link6          │ SE3(0.088, 0, 0; 90°, -0°, 0°) ⊕ Rz(q6)           │
-# └─────┴──────────────────────┴───────┴──────────────────────┴───────────────────────────────────────────────────┘
-
+import reachy2_modelling.pin as rp
+from reachy2_modelling.old.symik import *
 
 # ┌─────┬─────────────────────────┬───────┬───────────────────────┬──────────────────────────────────────────┐
 # │link │          link           │ joint │        parent         │           ETS: parent to link            │
@@ -150,36 +130,63 @@ class ArmHandler:
         "r_wrist_yaw",
     ]
 
-    def __init__(self, name):
+    ltip = 'l_arm_tip'
+    rtip = 'r_arm_tip'
+
+    def __init__(self, name, model):
         self.name = name
+        assert self.name == "l_arm" or self.name == "r_arm"
         self.prev_q = None
         self.prev_epoch_s = None
+        self.model = model
+
+        self.joints = self.rjoints
+        self.tip = self.rtip
+        if self.name == "l_arm":
+            self.joints = self.ljoints
+            self.tip = self.ltip
+
+    def modeldata(self):
+        return self.model, self.model.createData()
 
     def njoint_name(self, n):
-        if self.name == "l_arm":
-            return self.ljoints[n]
-        return self.rjoints[n]
+        return self.joints[n]
+
+    def fk(self, q, tip=None, world=False):
+        if tip is None:
+            tip = self.tip
+        model, data = self.modeldata()
+        return rp.fk(model, data, q, tip, world)
 
     def log(self, epoch_s, ik, M, urdf_logger):
         if M is not None:
             q, reachable, multiturn = ik.symbolic_inverse_kinematics(self.name, M)
-            if reachable:
-                for joint_idx, angle in enumerate(q):
-                    urdf_logger.log_joint_angle(self.njoint_name(joint_idx), angle)
 
-                if self.prev_q is not None:
-                    dt = epoch_s - self.prev_epoch_s
-                    qd = (q - self.prev_q) / dt
-                else:
-                    qd = np.zeros_like(q)
+            for joint_idx, angle in enumerate(q):
+                urdf_logger.log_joint_angle(self.njoint_name(joint_idx), angle)
 
-                self.prev_q = q
-                self.prev_epoch_s = epoch_s
+            if self.prev_q is not None:
+                dt = epoch_s - self.prev_epoch_s
+                qd = (q - self.prev_q) / dt
+            else:
+                qd = np.zeros_like(q)
 
-                for j, ang in enumerate(q):
-                    rr.log(arm_q_entity(self.name, j), rr.Scalar(ang))
-                for j, vel in enumerate(qd):
-                    rr.log(arm_qd_entity(self.name, j), rr.Scalar(vel))
+            self.prev_q = q
+            self.prev_epoch_s = epoch_s
+
+            Mcur = self.fk(q)
+            trans, R  = Mcur.translation, Mcur.rotation
+            for i, coord in enumerate(["x", "y", "z"]):
+                entity = teleop_arm_entity(self.name, f"state_{coord}")
+                rr.log(entity, rr.Scalar(trans[i]))
+
+            rr.log(arm_entity(self.name, "reachable"), rr.Scalar(reachable))
+            rr.log(arm_entity(self.name, "multiturn"), rr.Scalar(multiturn))
+
+            for j, ang in enumerate(q):
+                rr.log(arm_q_entity(self.name, j), rr.Scalar(ang))
+            for j, vel in enumerate(qd):
+                rr.log(arm_qd_entity(self.name, j), rr.Scalar(vel))
 
 
 class Scene:
@@ -187,7 +194,7 @@ class Scene:
     # https://github.com/rerun-io/python-example-droid-dataset/
     dir_path: Path
 
-    def __init__(self, dir_path: Path):
+    def __init__(self, dir_path: Path, model_l_arm, model_r_arm):
         self.dir_path = dir_path
 
         larmf = os.path.join(dir_path, "l_arm_target_pose.csv")
@@ -196,8 +203,8 @@ class Scene:
         self.df = df_target_poses(larmf, rarmf)
 
         self.ik = MySymIK()
-        self.larm = ArmHandler("l_arm")
-        self.rarm = ArmHandler("r_arm")
+        self.larm = ArmHandler("l_arm", model_l_arm)
+        self.rarm = ArmHandler("r_arm", model_r_arm)
         # ├── action
         # │   ├── target_cartesian_position <- includes orientation
         # │   ├── joint_position
@@ -212,44 +219,24 @@ class Scene:
         # self.robot_state = self.trajectory["observation"]["robot_state"]
         # self.trajectory_length = self.metadata["trajectory_length"]
 
-    def log_action(self, i: int) -> None:
-        pose = self.trajectory["action"]["cartesian_position"][i]
-        trans, mat = extract_extrinsics(pose)
-        rr.log(
-            "action/cartesian_position", rr.Transform3D(translation=trans, mat3x3=mat)
-        )
-        rr.log("action/cartesian_position", rr.Points3D([0, 0, 0], radii=0.02))
+    def log_teleop(self, Ml, Mr):
+        def pub(arm, M):
+            entity_base = f"world/world_joint/base_link/back_bar_joint/back_bar/torso_base/torso/{arm}_"
+            if M is not None:
+                trans, R  = M[:3,3], M[:3, :3]
+                entity = entity_base + "target_pose"
+                rr.log(
+                    entity, rr.Transform3D(translation=trans, mat3x3=R)
+                )
+                entity = entity_base + "target_cartesian_position"
+                rr.log(entity, rr.Points3D(trans, radii=0.02))
+                for i, coord in enumerate(["x", "y", "z"]):
+                    entity = teleop_arm_entity(arm, f"target_{coord}")
+                    rr.log(entity, rr.Scalar(trans[i]))
 
-        log_cartesian_velocity(
-            "action/cartesian_velocity", self.action["cartesian_velocity"][i]
-        )
+        pub("l_arm", M = Ml)
+        pub("r_arm", M = Mr)
 
-        rr.log("action/gripper_position", rr.Scalar(self.action["gripper_position"][i]))
-        rr.log("action/gripper_velocity", rr.Scalar(self.action["gripper_velocity"][i]))
-
-        for j, vel in enumerate(self.trajectory["action"]["cartesian_position"][i]):
-            rr.log(f"action/joint_velocity/{j}", rr.Scalar(vel))
-
-        pose = self.trajectory["action"]["target_cartesian_position"][i]
-        trans, mat = extract_extrinsics(pose)
-        rr.log(
-            "action/target_cartesian_position",
-            rr.Transform3D(translation=trans, mat3x3=mat),
-        )
-        rr.log("action/target_cartesian_position", rr.Points3D([0, 0, 0], radii=0.02))
-
-        rr.log(
-            "action/target_gripper_position",
-            rr.Scalar(self.action["target_gripper_position"][i]),
-        )
-
-    def log_robot_state(
-        self,
-        entity_to_transform: dict[str, tuple[np.ndarray, np.ndarray]],
-        q,
-    ) -> None:
-        for joint_idx, angle in enumerate(q):
-            log_angle_rot(entity_to_transform, joint_idx + 1, angle)
 
     def log(self, urdf_logger) -> None:
 
@@ -266,6 +253,8 @@ class Scene:
                 # exit(0)
 
             Ml, Mr = series_to_target_mat(series)
+
+            self.log_teleop(Ml, Mr)
             self.larm.log(epoch_s, self.ik, Ml, urdf_logger)
             self.rarm.log(epoch_s, self.ik, Mr, urdf_logger)
 
@@ -273,15 +262,28 @@ class Scene:
             # self.log_robot_state(urdf_logger.entity_to_transform)
 
 
-def arm_q_entity(name, i):
-    return f"/{name}/q/{i}"
+def teleop_arm_entity(name, i):
+    return f"teleop_{name}/{i}"
 
+def arm_entity(name, i):
+    return f"/{name}/{i}"
+
+def arm_q_entity(name, i):
+    return arm_entity(name, "q") + f"{i}"
 
 def arm_qd_entity(name, i):
-    return f"/{name}/qd/{i}"
+    return arm_entity(name, "qd")+ f"{i}"
+
+def teleop_blueprint():
+    return Vertical(
+            TimeSeriesView(origin=teleop_arm_entity("l_arm", "")),
+            TimeSeriesView(origin=teleop_arm_entity("r_arm", "")),
+            name="target_position",
+        )
 
 
 def arm_joints_tab(name):
+
     return Horizontal(
         Vertical(
             *(TimeSeriesView(origin=arm_q_entity(name, i)) for i in range(7)),
@@ -298,7 +300,11 @@ def arm_joints_tab(name):
 def blueprint():
     return Blueprint(
         Horizontal(
+            Vertical(
             Spatial3DView(name="spatial view", origin="/", contents=["/**"]),
+                teleop_blueprint(),
+                row_shares=[1, 1],
+            ),
             Vertical(
                 Tabs(
                     arm_joints_tab("l_arm"),

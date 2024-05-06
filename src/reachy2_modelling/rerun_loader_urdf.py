@@ -30,40 +30,6 @@ class URDFLogger:
         self.root_path = root_path
         self.joint_entity_paths = {}
 
-    #     urdf_str = open(filepath).read()
-    #     model = pin.buildModelFromXML(urdf_str)
-    #     # robot = pin.RobotWrapper.BuildFromURDF(filepath)
-    #     # model = robot.model
-
-    #     data = model.createData()
-    #     q = pin.neutral(model)
-    #     pin.forwardKinematics(model, data, q)
-    #     pin.updateFramePlacements(model, data)
-    #     self.modelpin = model
-    #     self.datapin = data
-
-    # def initial_trans_rot(self, frame_name):
-    #     model, data = self.modelpin, self.datapin
-    #     print('frame:', frame_name)
-    #     frame_id = model.getFrameId(frame_name)
-    #     frame_X = data.oMf[frame_id]
-
-    #     if frame_name=='world_joint':
-    #         X = frame_X
-    #         return X.translation.tolist(), X.rotation
-    #     try:
-    #         prev_frame_name_idx = list(self.joint_entity_paths.keys()).index(frame_name)-1
-    #         prev_frame_name = list(self.joint_entity_paths.keys())[prev_frame_name_idx]
-    #         prev_frame_id =model.getFrameId(prev_frame_name)
-    #         prev_X = data.oMf[prev_frame_id]
-    #         X = prev_X.actInv(frame_X)
-    #     except ValueError as e:
-    #         print('conflict:', frame_name)
-    #         print(self.joint_entity_paths[frame_name])
-    #         X = frame_X
-
-    #     return X.translation.tolist(), X.rotation
-
     def link_entity_path(self, link: urdf_parser.Link) -> str:
         """Return the entity path for the URDF link."""
         root_name = self.urdf.get_root()

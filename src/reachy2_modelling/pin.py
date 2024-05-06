@@ -36,6 +36,48 @@ data = model.createData()
 # model, data = robot.model, robot.data
 
 
+def jacobian_frame(q, modeldata, tip=None):
+    [model, data] = modeldata
+    if tip is None:
+        tip = model.frames[-1].name
+    joint_id = model.getFrameId(tip)
+    J = pin.computeFrameJacobian(
+        model, data, q, joint_id, reference_frame=pin.LOCAL_WORLD_ALIGNED
+    )
+    return J
+
+
+def jacobian_joint(q, modeldata, tip):
+    [model, data] = modeldata
+    joint_id = model.getJointId(tip)
+    J = pin.computeJointJacobian(model, data, q, joint_id)
+    return J
+
+
+def svals(J):
+    u, s, v = np.linalg.svd(J)
+    return s
+
+
+def manip(J):
+    return np.sqrt(np.linalg.det(J.T @ J))
+
+
+def fk(model, data, q, tip, world_frame=False):
+    # should not be needed:
+    # https://gepettoweb.laas.fr/doc/stack-of-tasks/pinocchio/master/doxygen-html/namespacepinocchio.html#a89903169c76d3c55bacaa2479bd39f76
+    # pin.forwardKinematics(model, data, q)
+    pin.framesForwardKinematics(model, data, q)
+
+    frame_id = model.getFrameId(tip)
+    X = data.oMf[frame_id]
+
+    # if not world, then it's torso
+    if not world_frame:
+        X = data.oMf[model.getFrameId("torso")].actInv(X)
+    return X.copy()
+
+
 def arm_joint_list(arm):
     assert arm == "l" or arm == "r"
     l_arm_joints_tokeep = [

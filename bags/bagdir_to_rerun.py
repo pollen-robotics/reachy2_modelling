@@ -8,22 +8,35 @@ import pandas as pd
 import rerun as rr
 from scipy.spatial.transform import Rotation
 
-import reachy2_modelling as rm
-import reachy2_modelling.old.rerun_utils as ru
-from reachy2_modelling.old.pin import urdf_path as old_urdf
-from reachy2_modelling.old.symik import *
+import reachy2_modelling.old.pin as oldrp
+import reachy2_modelling.pin as rp
+import reachy2_modelling.rerun_utils as ru
 from reachy2_modelling.rerun_loader_urdf import URDFLogger
 
 parser = argparse.ArgumentParser()
 parser.add_argument("bagdir", type=str)
+parser.add_argument("--web", action="store_true", help="start rerun in web mode")
+parser.add_argument("--old", action="store_true", help="use old urdf model")
 args = parser.parse_args()
 print("bagdir:", args.bagdir)
-# urdf_path = old_urdf # for debugging
-urdf_path = rm.pin.urdf_path
+
+########################
+# use new or old model
+rpp = rp
+if args.old:
+    rpp = oldrp
+########################
+
+urdf_path = rpp.urdf_path
+model_l_arm = rpp.model_l_arm
+model_r_arm = rpp.model_r_arm
 print("urdf:", urdf_path)
 
 print("rr init...")
-rr.init("Reachy Replay", spawn=True)
+
+rr.init("Reachy Replay", spawn=not args.web)
+if args.web:
+    rr.serve()
 rr.send_blueprint(ru.blueprint())
 
 print("urdflogger...")
@@ -37,6 +50,6 @@ urdf_logger = URDFLogger(urdf_path)
 # urdfp = urdfp_logger.urdf
 # rjoints = [x for x in urdf_logger.joint_entity_paths.keys() if 'r_' in x]
 
-scene = ru.Scene(args.bagdir)
+scene = ru.Scene(args.bagdir, model_l_arm, model_r_arm)
 print("scene.log()...")
 scene.log(urdf_logger)
