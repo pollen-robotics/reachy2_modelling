@@ -86,99 +86,6 @@ from .symik import *
 #   Joint 20 r_hand_finger: parent=19
 #   Joint 21 r_hand_finger_mimic: parent=19
 
-# rlinks = [
-#     # 'world/world_joint/torso/r_virtual_joint/r_virtual_offset',
-#     'world/world_joint/torso/r_virtual_joint/r_virtual_offset/r_shoulder_pitch/r_shoulder_dummy_link', #0
-#     'world/world_joint/torso/r_virtual_joint/r_virtual_offset/r_shoulder_pitch/r_shoulder_dummy_link/r_shoulder_roll/r_shoulder_link', #1
-#     # 'world/world_joint/torso/r_virtual_joint/r_virtual_offset/r_shoulder_pitch/r_shoulder_dummy_link/r_shoulder_roll/r_shoulder_link/r_shoulder_ball_joint/r_shoulder_ball_link',
-#     'world/world_joint/torso/r_virtual_joint/r_virtual_offset/r_shoulder_pitch/r_shoulder_dummy_link/r_shoulder_roll/r_shoulder_link/r_shoulder_ball_joint/r_shoulder_ball_link/r_elbow_yaw/r_elbow_dummy_link', #2
-#     'world/world_joint/torso/r_virtual_joint/r_virtual_offset/r_shoulder_pitch/r_shoulder_dummy_link/r_shoulder_roll/r_shoulder_link/r_shoulder_ball_joint/r_shoulder_ball_link/r_elbow_yaw/r_elbow_dummy_link/r_elbow_pitch/r_elbow_link', #3
-#     # 'world/world_joint/torso/r_virtual_joint/r_virtual_offset/r_shoulder_pitch/r_shoulder_dummy_link/r_shoulder_roll/r_shoulder_link/r_shoulder_ball_joint/r_shoulder_ball_link/r_elbow_yaw/r_elbow_dummy_link/r_elbow_pitch/r_elbow_link/r_elbow_ball_joint/r_elbow_ball_link',
-#     # 'world/world_joint/torso/r_virtual_joint/r_virtual_offset/r_shoulder_pitch/r_shoulder_dummy_link/r_shoulder_roll/r_shoulder_link/r_shoulder_ball_joint/r_shoulder_ball_link/r_elbow_yaw/r_elbow_dummy_link/r_elbow_pitch/r_elbow_link/r_elbow_ball_joint/r_elbow_ball_link/r_wrist_roll/r_wrist_dummy_link1/r_wrist_pitch/r_wrist_dummy_link2/r_wrist_yaw/r_wrist_link/r_wrist_ball_joint/r_wrist_ball_link',
-#     'world/world_joint/torso/r_virtual_joint/r_virtual_offset/r_shoulder_pitch/r_shoulder_dummy_link/r_shoulder_roll/r_shoulder_link/r_shoulder_ball_joint/r_shoulder_ball_link/r_elbow_yaw/r_elbow_dummy_link/r_elbow_pitch/r_elbow_link/r_elbow_ball_joint/r_elbow_ball_link/r_wrist_roll/r_wrist_dummy_link1', #4
-#     'world/world_joint/torso/r_virtual_joint/r_virtual_offset/r_shoulder_pitch/r_shoulder_dummy_link/r_shoulder_roll/r_shoulder_link/r_shoulder_ball_joint/r_shoulder_ball_link/r_elbow_yaw/r_elbow_dummy_link/r_elbow_pitch/r_elbow_link/r_elbow_ball_joint/r_elbow_ball_link/r_wrist_roll/r_wrist_dummy_link1/r_wrist_pitch/r_wrist_dummy_link2', #5
-#     'world/world_joint/torso/r_virtual_joint/r_virtual_offset/r_shoulder_pitch/r_shoulder_dummy_link/r_shoulder_roll/r_shoulder_link/r_shoulder_ball_joint/r_shoulder_ball_link/r_elbow_yaw/r_elbow_dummy_link/r_elbow_pitch/r_elbow_link/r_elbow_ball_joint/r_elbow_ball_link/r_wrist_roll/r_wrist_dummy_link1/r_wrist_pitch/r_wrist_dummy_link2/r_wrist_yaw/r_wrist_link', #6
-#     # 'world/world_joint/torso/r_virtual_joint/r_virtual_offset/r_shoulder_pitch/r_shoulder_dummy_link/r_shoulder_roll/r_shoulder_link/r_shoulder_ball_joint/r_shoulder_ball_link/r_elbow_yaw/r_elbow_dummy_link/r_elbow_pitch/r_elbow_link/r_elbow_ball_joint/r_elbow_ball_link/r_wrist_roll/r_wrist_dummy_link1/r_wrist_pitch/r_wrist_dummy_link2/r_wrist_yaw/r_wrist_link/r_wrist_ball_joint/r_wrist_ball_link/r_hand_palm/r_hand_palm_link',
-#     'world/world_joint/torso/r_virtual_joint/r_virtual_offset/r_shoulder_pitch/r_shoulder_dummy_link/r_shoulder_roll/r_shoulder_link/r_shoulder_ball_joint/r_shoulder_ball_link/r_elbow_yaw/r_elbow_dummy_link/r_elbow_pitch/r_elbow_link/r_elbow_ball_joint/r_elbow_ball_link/r_wrist_roll/r_wrist_dummy_link1/r_wrist_pitch/r_wrist_dummy_link2/r_wrist_yaw/r_wrist_link/r_wrist_ball_joint/r_wrist_ball_link/r_hand_palm/r_hand_palm_link/r_hand_finger/r_hand_index_link', #7
-# ]
-
-# llinks = [x.replace("/r_", "/l_") for x in rlinks]
-
-# def path_to_link(i: int, links) -> str:
-#     return links[i]
-
-
-llinks = [
-    "world/world_joint/torso/l_virtual_joint/l_virtual_offset/l_shoulder_dummy_link",
-    "l_shoulder_link",
-    "l_shoulder_ball_joint/l_shoulder_ball_link/l_elbow_dummy_link",
-    "l_elbow_link",
-    "l_elbow_ball_joint/l_elbow_ball_link/l_wrist_dummy_link1",
-    "l_wrist_dummy_link2",
-    "l_wrist_link",
-    "l_wrist_ball_joint/l_wrist_ball_link/l_hand_palm/l_hand_palm_link",
-]
-
-rlinks = [
-    "world/world_joint/torso/r_virtual_joint/r_virtual_offset/r_shoulder_dummy_link",
-    "r_shoulder_link",
-    "r_shoulder_ball_joint/r_shoulder_ball_link/r_elbow_dummy_link",
-    "r_elbow_link",
-    "r_elbow_ball_joint/r_elbow_ball_link/r_wrist_dummy_link1",
-    "r_wrist_dummy_link2",
-    "r_wrist_link",
-    "r_wrist_ball_joint/r_wrist_ball_link/r_hand_palm/r_hand_palm_link",
-]
-
-
-# llinks = [
-#     'world/torso/l_virtual_offset/l_shoulder_dummy_link',
-#     'l_shoulder_link',
-#     'l_shoulder_ball_link/l_elbow_dummy_link',
-#     'l_elbow_link',
-#     'l_elbow_ball_link/l_wrist_dummy_link1',
-#     'l_wrist_dummy_link2',
-#     'l_wrist_link',
-#     'l_wrist_ball_link/l_hand_palm_link/l_arm_tip',
-# ]
-
-# rlinks = [
-#     'world/torso/r_virtual_offset/r_shoulder_dummy_link',
-#     'r_shoulder_link',
-#     'r_shoulder_ball_link/r_elbow_dummy_link',
-#     'r_elbow_link',
-#     'r_elbow_ball_link/r_wrist_dummy_link1',
-#     'r_wrist_dummy_link2',
-#     'r_wrist_link',
-#     'r_wrist_ball_link/r_hand_palm_link/r_arm_tip',
-# ]
-
-
-def path_to_link(i: int, links) -> str:
-    return "/".join(links[: i + 1])
-
-
-def log_angle_rot(
-    entity_to_transform: dict[str, tuple[np.ndarray, np.ndarray]],
-    link: int,
-    angle_rad: int,
-    arm,
-) -> None:
-    entity_path = path_to_link(link, llinks if arm == "l_arm" else rlinks)
-
-    start_translation, start_rotation_mat = entity_to_transform[entity_path]
-
-    # All angles describe rotations around the transformed z-axis.
-    vec = np.array(np.array([0, 0, 1]) * angle_rad)
-
-    rot = Rotation.from_rotvec(vec).as_matrix()
-    rotation_mat = start_rotation_mat @ rot
-
-    print(entity_path)
-    rr.log(
-        entity_path, rr.Transform3D(translation=start_translation, mat3x3=rotation_mat)
-    )
-
 
 def series_to_target_mat(series):
     target_pose_cols = ["pos_x", "pos_y", "pos_z", "or_x", "or_y", "or_z", "or_w"]
@@ -223,21 +130,42 @@ def df_target_poses(larmf, rarmf):
 
 
 class ArmHandler:
+    ljoints = [
+        "l_shoulder_pitch",
+        "l_shoulder_roll",
+        "l_elbow_yaw",
+        "l_elbow_pitch",
+        "l_wrist_roll",
+        "l_wrist_pitch",
+        "l_wrist_yaw",
+    ]
+
+    rjoints = [
+        "r_shoulder_pitch",
+        "r_shoulder_roll",
+        "r_elbow_yaw",
+        "r_elbow_pitch",
+        "r_wrist_roll",
+        "r_wrist_pitch",
+        "r_wrist_yaw",
+    ]
+
     def __init__(self, name):
         self.name = name
         self.prev_q = None
         self.prev_epoch_s = None
 
+    def njoint_name(self, n):
+        if self.name == "l_arm":
+            return self.ljoints[n]
+        return self.rjoints[n]
+
     def log(self, epoch_s, ik, M, urdf_logger):
         if M is not None:
             q, reachable, multiturn = ik.symbolic_inverse_kinematics(self.name, M)
             if reachable:
-                for key in urdf_logger.entity_to_transform.keys():
-                    print(key)
                 for joint_idx, angle in enumerate(q):
-                    log_angle_rot(
-                        urdf_logger.entity_to_transform, joint_idx + 1, angle, self.name
-                    )
+                    urdf_logger.log_joint_angle(self.njoint_name(joint_idx), angle)
 
                 if self.prev_q is not None:
                     dt = epoch_s - self.prev_epoch_s

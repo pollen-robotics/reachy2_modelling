@@ -25,8 +25,14 @@ rr.send_blueprint(ru.blueprint())
 
 print("urdflogger...")
 urdf_logger = URDFLogger(rm.urdf_path)
-print(urdf_logger.entity_to_transform)
-
+# urdfp_logger = URDFLogger("/home/user/pol/python-example-droid-dataset/franka_description/panda.urdf")
+# print(urdf_logger.entity_to_transform)
+# urdf_logger.log()
+# urdfp_logger.log()
+# urdf_logger.log_joint()
+# urdf = urdf_logger.urdf
+# urdfp = urdfp_logger.urdf
+# rjoints = [x for x in urdf_logger.joint_entity_paths.keys() if 'r_' in x]
 
 scene = ru.Scene(args.bagdir)
 print("scene.log()...")

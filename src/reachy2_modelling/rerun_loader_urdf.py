@@ -10,10 +10,12 @@ import pathlib
 from typing import Optional
 
 import numpy as np
+import pinocchio as pin
 import rerun as rr  # pip install rerun-sdk
 import scipy.spatial.transform as st
 import trimesh
 from PIL import Image
+from scipy.spatial.transform import Rotation
 
 from .kdl_parser_py.urdf_parser_py import urdf as urdf_parser
 
@@ -26,33 +28,54 @@ class URDFLogger:
         self.mat_name_to_mat = {mat.name: mat for mat in self.urdf.materials}
         self.entity_to_transform = {}
         self.root_path = root_path
+        self.joint_entity_paths = {}
+
+    #     urdf_str = open(filepath).read()
+    #     model = pin.buildModelFromXML(urdf_str)
+    #     # robot = pin.RobotWrapper.BuildFromURDF(filepath)
+    #     # model = robot.model
+
+    #     data = model.createData()
+    #     q = pin.neutral(model)
+    #     pin.forwardKinematics(model, data, q)
+    #     pin.updateFramePlacements(model, data)
+    #     self.modelpin = model
+    #     self.datapin = data
+
+    # def initial_trans_rot(self, frame_name):
+    #     model, data = self.modelpin, self.datapin
+    #     print('frame:', frame_name)
+    #     frame_id = model.getFrameId(frame_name)
+    #     frame_X = data.oMf[frame_id]
+
+    #     if frame_name=='world_joint':
+    #         X = frame_X
+    #         return X.translation.tolist(), X.rotation
+    #     try:
+    #         prev_frame_name_idx = list(self.joint_entity_paths.keys()).index(frame_name)-1
+    #         prev_frame_name = list(self.joint_entity_paths.keys())[prev_frame_name_idx]
+    #         prev_frame_id =model.getFrameId(prev_frame_name)
+    #         prev_X = data.oMf[prev_frame_id]
+    #         X = prev_X.actInv(frame_X)
+    #     except ValueError as e:
+    #         print('conflict:', frame_name)
+    #         print(self.joint_entity_paths[frame_name])
+    #         X = frame_X
+
+    #     return X.translation.tolist(), X.rotation
 
     def link_entity_path(self, link: urdf_parser.Link) -> str:
         """Return the entity path for the URDF link."""
         root_name = self.urdf.get_root()
 
-        def isjoint(name):
-            return "roll" in name or "pitch" in name or "yaw" in name
-
-        link_names = [
-            x for x in self.urdf.get_chain(root_name, link.name) if not isjoint(x)
-        ]
-        # link_names = self.urdf.get_chain(root_name, link.name)  # [0::2]  # skip the joints
-        print("link_names:", link_names)
+        link_names = self.urdf.get_chain(root_name, link.name)
         return "/".join(link_names)
 
     def joint_entity_path(self, joint: urdf_parser.Joint) -> str:
         """Return the entity path for the URDF joint."""
         root_name = self.urdf.get_root()
 
-        def isjoint(name):
-            return "roll" in name or "pitch" in name or "yaw" in name
-
-        link_names = [
-            x for x in self.urdf.get_chain(root_name, joint.child) if not isjoint(x)
-        ]
-        # link_names = self.urdf.get_chain(root_name, joint.child)  # [0::2]  # skip the joints
-        print("joint_names:", link_names)
+        link_names = self.urdf.get_chain(root_name, joint.child)
         return "/".join(link_names)
 
     def log(self) -> None:
@@ -61,34 +84,30 @@ class URDFLogger:
             self.root_path + "", rr.ViewCoordinates.RIGHT_HAND_Z_UP, timeless=True
         )  # default ROS convention
 
-        print(30 * "-")
-        print(30 * "-")
-        print(30 * "-")
-        print("JOINTS")
-        print(30 * "-")
-        print(30 * "-")
-        print(30 * "-")
         for i, joint in enumerate(self.urdf.joints):
             entity_path = self.joint_entity_path(joint)
-            print(">>>>>>   ", i)
             self.log_joint(entity_path, joint)
-        print(30 * "-")
-        print(30 * "-")
-        print(30 * "-")
 
-        # print(30 * "=")
-        # print(30 * "=")
-        # print(30 * "=")
-        # print("LINKS")
-        # print(30 * "=")
-        # print(30 * "=")
-        # print(30 * "=")
         for link in self.urdf.links:
             entity_path = self.link_entity_path(link)
             self.log_link(entity_path, link)
-        # print(30 * "=")
-        # print(30 * "=")
-        # print(30 * "=")
+
+    def log_joint_angle(self, joint_name, angle_rad):
+        entity_path = self.joint_entity_paths[joint_name]
+
+        start_translation, start_rotation_mat = self.entity_to_transform[entity_path]
+
+        # All angles describe rotations around the transformed z-axis.
+        axis = self.urdf.joint_map[joint_name].axis
+        vec = np.array(np.array(axis) * angle_rad)
+
+        rot = Rotation.from_rotvec(vec).as_matrix()
+        rotation_mat = start_rotation_mat @ rot
+
+        rr.log(
+            entity_path,
+            rr.Transform3D(translation=start_translation, mat3x3=rotation_mat),
+        )
 
     def log_link(self, entity_path: str, link: urdf_parser.Link) -> None:
         # create one mesh out of all visuals
@@ -104,15 +123,13 @@ class URDFLogger:
         if joint.origin is not None and joint.origin.rpy is not None:
             rotation = st.Rotation.from_euler("xyz", joint.origin.rpy).as_matrix()
 
-        self.entity_to_transform[self.root_path + entity_path] = (translation, rotation)
+        ent_path = self.root_path + entity_path
+        self.joint_entity_paths[joint.name] = ent_path
+        self.entity_to_transform[ent_path] = (translation, rotation)
         rr.log(
-            self.root_path + entity_path,
+            ent_path,
             rr.Transform3D(translation=translation, mat3x3=rotation),
         )
-        print(40 * "_")
-        print("log_joint")
-        print(self.root_path + entity_path)
-        print(40 * "_")
 
     def log_visual(self, entity_path: str, visual: urdf_parser.Visual) -> None:
         material = None
