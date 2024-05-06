@@ -130,8 +130,8 @@ class ArmHandler:
         "r_wrist_yaw",
     ]
 
-    ltip = 'l_arm_tip'
-    rtip = 'r_arm_tip'
+    ltip = "l_arm_tip"
+    rtip = "r_arm_tip"
 
     def __init__(self, name, model):
         self.name = name
@@ -175,7 +175,7 @@ class ArmHandler:
             self.prev_epoch_s = epoch_s
 
             Mcur = self.fk(q)
-            trans, R  = Mcur.translation, Mcur.rotation
+            trans, R = Mcur.translation, Mcur.rotation
             for i, coord in enumerate(["x", "y", "z"]):
                 entity = teleop_arm_entity(self.name, f"state_{coord}")
                 rr.log(entity, rr.Scalar(trans[i]))
@@ -223,20 +223,17 @@ class Scene:
         def pub(arm, M):
             entity_base = f"world/world_joint/base_link/back_bar_joint/back_bar/torso_base/torso/{arm}_"
             if M is not None:
-                trans, R  = M[:3,3], M[:3, :3]
+                trans, R = M[:3, 3], M[:3, :3]
                 entity = entity_base + "target_pose"
-                rr.log(
-                    entity, rr.Transform3D(translation=trans, mat3x3=R)
-                )
+                rr.log(entity, rr.Transform3D(translation=trans, mat3x3=R))
                 entity = entity_base + "target_cartesian_position"
                 rr.log(entity, rr.Points3D(trans, radii=0.02))
                 for i, coord in enumerate(["x", "y", "z"]):
                     entity = teleop_arm_entity(arm, f"target_{coord}")
                     rr.log(entity, rr.Scalar(trans[i]))
 
-        pub("l_arm", M = Ml)
-        pub("r_arm", M = Mr)
-
+        pub("l_arm", M=Ml)
+        pub("r_arm", M=Mr)
 
     def log(self, urdf_logger) -> None:
 
@@ -265,21 +262,25 @@ class Scene:
 def teleop_arm_entity(name, i):
     return f"teleop_{name}/{i}"
 
+
 def arm_entity(name, i):
     return f"/{name}/{i}"
+
 
 def arm_q_entity(name, i):
     return arm_entity(name, "q") + f"{i}"
 
+
 def arm_qd_entity(name, i):
-    return arm_entity(name, "qd")+ f"{i}"
+    return arm_entity(name, "qd") + f"{i}"
+
 
 def teleop_blueprint():
     return Vertical(
-            TimeSeriesView(origin=teleop_arm_entity("l_arm", "")),
-            TimeSeriesView(origin=teleop_arm_entity("r_arm", "")),
-            name="target_position",
-        )
+        TimeSeriesView(origin=teleop_arm_entity("l_arm", "")),
+        TimeSeriesView(origin=teleop_arm_entity("r_arm", "")),
+        name="target_position",
+    )
 
 
 def arm_joints_tab(name):
@@ -301,7 +302,7 @@ def blueprint():
     return Blueprint(
         Horizontal(
             Vertical(
-            Spatial3DView(name="spatial view", origin="/", contents=["/**"]),
+                Spatial3DView(name="spatial view", origin="/", contents=["/**"]),
                 teleop_blueprint(),
                 row_shares=[1, 1],
             ),
