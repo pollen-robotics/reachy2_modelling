@@ -15,28 +15,39 @@ def blank(fname):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("bagdir", type=str)
+parser.add_argument(
+    "--verify", action="store_true", help="only verifies csv files are correct"
+)
 args = parser.parse_args()
 print("bagdir:", args.bagdir)
 
 
 larmf = os.path.join(args.bagdir, "l_arm_target_pose.csv")
 rarmf = os.path.join(args.bagdir, "r_arm_target_pose.csv")
-blank(larmf)
-blank(rarmf)
-print("CSVS:", larmf, rarmf)
 
-lcmd = f"./topic_to_csv.py /l_arm/target_pose {larmf}"
-rcmd = f"./topic_to_csv.py /r_arm/target_pose {rarmf}"
-lproc = subprocess.Popen(lcmd, shell=True)
-rproc = subprocess.Popen(rcmd, shell=True)
+if args.verify:
+    print("--verify provided, will only check csv files (and not play bag)")
+else:
+    print("blank csv files:", larmf, rarmf)
+    blank(larmf)
+    blank(rarmf)
+    lcmd = f"./topic_to_csv.py /l_arm/target_pose {larmf}"
+    rcmd = f"./topic_to_csv.py /r_arm/target_pose {rarmf}"
+    lproc = subprocess.Popen("exec " + lcmd, shell=True)
+    rproc = subprocess.Popen("exec " + rcmd, shell=True)
 
-print("wait for subscriptions...")
-while (flines(larmf) == 0) or (flines(rarmf) == 0):
-    pass
+    print("wait for subscriptions...")
+    while (flines(larmf) == 0) or (flines(rarmf) == 0):
+        pass
 
-print("play ros bag...")
-cmd = f"ros2 bag play --qos-profile-overrides-path reliability_override.yaml -r 30 {args.bagdir}"
-subprocess.check_output(cmd, shell=True)
+    replay_logfile = f"{args.bagdir.rstrip('/')}.log"
+    print(f"ros bag replay log: {replay_logfile}")
+    print("play ros bag...")
+    cmd = f"ros2 bag play --qos-profile-overrides-path reliability_override.yaml -r 30 {args.bagdir} > {replay_logfile} 2>&1"
+    subprocess.check_output(cmd, shell=True)
+
+    lproc.kill()
+    rproc.kill()
 
 
 # header:
@@ -59,17 +70,20 @@ subprocess.check_output(cmd, shell=True)
 # sed -i "1s/^/${header}/" ${larmf}
 # sed -i "1s/^/${header}/" ${rarmf}
 
-print("count lines...")
-cmd = f"wc -l {larmf} {rarmf}"
-print(subprocess.check_output(cmd, shell=True).rstrip().decode("utf-8"))
+# print("count lines...")
+# cmd = f"wc -l {larmf} {rarmf}"
+# print(subprocess.check_output(cmd, shell=True).rstrip().decode("utf-8"))
 
 sqlcmd = "SELECT topics.id, topics.name, count(messages.topic_id) from topics, messages where messages.topic_id=topics.id group by topics.name;"
 try:
-    subprocess.check_call(["which", "sqlite3"])
+    subprocess.check_output(["which", "sqlite3"])
 except subprocess.CalledProcessError:
     print("sqlite3 not found, can't verify rosbag size")
+    if args.verify:
+        exit(1)
     exit(0)
 
+print(25 * "-")
 dirr = args.bagdir
 dbs = [
     fname
@@ -87,12 +101,19 @@ larm_inline = ["l_arm" in line for line in rawstr.split("\n")]
 linecount_pertopic = [int(line.split("|")[-1]) for line in rawstr.split("\n")]
 assert len(larm_inline) == len(linecount_pertopic)
 
+count_correct = True
 for larm_flag, count in zip(larm_inline, linecount_pertopic):
     armf = larmf if larm_flag else rarmf
     result = flines(armf) - 1  # -1 from header
     if result != count:
+        count_correct = False
+        print(10 * "X")
         print(
             f"Warning: {'l_arm' if larm_flag else 'r_arm'} count is wrong, it is {result} instead of {count}"
         )
     else:
         print(f"{'l_arm' if larm_flag else 'r_arm'} count is OK {result} = {count}")
+print(25 * "-")
+
+if args.verify and not count_correct:
+    exit(1)

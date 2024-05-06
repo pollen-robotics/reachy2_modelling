@@ -2,6 +2,7 @@
 
 import argparse
 import subprocess
+from datetime import datetime
 
 import rclpy
 from geometry_msgs.msg import PoseStamped
@@ -9,7 +10,7 @@ from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import String
 
-HEADER = "stamp_sec,stamp_nanosec,stamp_frame_id,pos_x,pos_y,pos_z,or_x,or_y,or_z,or_w"
+HEADER = "epoch_s,stamp_sec,stamp_nanosec,stamp_frame_id,pos_x,pos_y,pos_z,or_x,or_y,or_z,or_w"
 
 
 def tofile(text, fpath):
@@ -36,6 +37,7 @@ class MySubscriber(Node):
         print("subscribed")
         self.outfile = outfile
         self.tofile(HEADER)
+        self.start_epoch_s = None
 
     def tofile(self, msg):
         with open(self.outfile, "a") as wf:
@@ -48,7 +50,9 @@ class MySubscriber(Node):
         stamp = header.stamp
         pos = msg.pose.position
         orientation = msg.pose.orientation
-        towrite = f"{stamp.sec},{stamp.nanosec},{header.frame_id},"
+        epoch_s = stamp.sec + stamp.nanosec / 1e9
+        towrite = f"{epoch_s},"
+        towrite += f"{stamp.sec},{stamp.nanosec},{header.frame_id},"
         towrite += f"{pos.x},{pos.y},{pos.z},"
         towrite += f"{orientation.x},{orientation.y},{orientation.z},{orientation.w}"
         # print(towrite)

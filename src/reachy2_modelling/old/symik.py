@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import argparse
 import csv
 import sys
@@ -9,79 +7,37 @@ import numpy as np
 import pinocchio as pin
 import PyKDL as kdl
 from reachy2_symbolic_ik.symbolic_ik import SymbolicIK
-from reachy2_symbolic_ik.utils import (angle_diff, get_best_continuous_theta,
-                                       limit_theta_to_interval,
-                                       tend_to_prefered_theta)
+from reachy2_symbolic_ik.utils import (
+    angle_diff,
+    get_best_continuous_theta,
+    limit_theta_to_interval,
+    tend_to_prefered_theta,
+)
 from scipy.spatial.transform import Rotation
+
+from .pin import model_l_arm, model_r_arm
 
 np.set_printoptions(formatter={"float": lambda x: "{0:0.2f}".format(x)})
 
-urdf_path = "../reachy.urdf"
-robot = pin.RobotWrapper.BuildFromURDF(urdf_path)
-model, data = robot.model, robot.data
-# lock the other joints
-tolock = [
-    "l_shoulder_pitch",
-    "l_shoulder_roll",
-    "l_elbow_yaw",
-    "l_elbow_pitch",
-    "l_wrist_roll",
-    "l_wrist_pitch",
-    "l_wrist_yaw",
-    "l_hand_finger",
-    "l_hand_finger_mimic",
-    # 'r_wrist_roll',
-    # 'r_wrist_pitch',
-    # 'r_wrist_yaw',
-    "r_hand_finger",
-    "r_hand_finger_mimic",
-    "neck_roll",
-    "neck_pitch",
-    "neck_yaw",
-]
-
-# tolock = [
-#     'r_shoulder_pitch',
-#     'r_shoulder_roll',
-#     'r_elbow_yaw',
-#     'r_elbow_pitch',
-#     'r_wrist_roll',
-#     'r_wrist_pitch',
-#     'r_wrist_yaw',
-#     'r_hand_finger',
-#     'r_hand_finger_mimic',
-#     # 'l_wrist_roll',
-#     # 'l_wrist_pitch',
-#     # 'l_wrist_yaw',
-#     'l_hand_finger',
-#     'l_hand_finger_mimic',
-#     'neck_roll',
-#     'neck_pitch',
-#     'neck_yaw',
-# ]
-
-# Get the ID of all existing joints
-jointsToLockIDs = []
-for jn in tolock:
-    if model.existJointName(jn):
-        jointsToLockIDs.append(model.getJointId(jn))
-robot.model = pin.buildReducedModel(model, jointsToLockIDs, np.zeros(21))
-robot.data = robot.model.createData()
+model_larm, model_rarm = model_l_arm, model_r_arm
+data_larm, data_rarm = model_larm.createData(), model_rarm.createData()
 
 
-def jacobian_frame(q, tip=None, robot=robot):
+def jacobian_frame(q, modeldata, tip=None):
+    [model, data] = modeldata
     if tip is None:
-        tip = robot.model.frames[-1].name
-    joint_id = robot.model.getFrameId(tip)
+        tip = model.frames[-1].name
+    joint_id = model.getFrameId(tip)
     J = pin.computeFrameJacobian(
-        robot.model, robot.data, q, joint_id, reference_frame=pin.LOCAL_WORLD_ALIGNED
+        model, data, q, joint_id, reference_frame=pin.LOCAL_WORLD_ALIGNED
     )
     return J
 
 
-def jacobian_joint(q, tip=None, robot=robot):
-    joint_id = robot.model.getJointId(tip)
-    J = pin.computeJointJacobian(robot.model, robot.data, q, joint_id)
+def jacobian_joint(q, modeldata, tip):
+    [model, data] = modeldata
+    joint_id = model.getJointId(tip)
+    J = pin.computeJointJacobian(model, data, q, joint_id)
     return J
 
 
@@ -94,19 +50,20 @@ def manip(J):
     return np.sqrt(np.linalg.det(J.T @ J))
 
 
-def fk(q, tip=None, robot=robot):
+def fk(q, modeldata, tip):
+    [model, data] = modeldata
     # joint_id =  robot.model.getFrameId(robot.model.frames[-1].name)
     if tip is None:
-        tip = robot.model.frames[-1].name
-    joint_id = robot.model.getFrameId(tip)
-    pin.framesForwardKinematics(robot.model, robot.data, q)
+        tip = model.frames[-1].name
+    joint_id = model.getFrameId(tip)
+    pin.framesForwardKinematics(model, data, q)
     # pin.computeJointJacobians(robot.model, robot.data, q)
-    return robot.data.oMf[robot.model.getFrameId(tip)].copy()
+    return data.oMf[model.getFrameId(tip)].copy()
 
 
 def inverse_kinematics(
     ik_solver, q0: np.ndarray, target_pose: np.ndarray, nb_joints: int
-) -> Tuple[float, np.ndarray]:
+):
     """Compute the inverse kinematics of the given arm.
     The function assumes the number of joints is correct!
     """
@@ -286,75 +243,3 @@ class MySymIK:
                 # TEMP forbidding multiturn
                 # new_joints[index] = np.sign(new_joints[index]) * np.pi
         return new_joints, multiturn
-
-
-parser = argparse.ArgumentParser()
-parser.add_argument("csvfile", type=str)
-args = parser.parse_args()
-
-ik = MySymIK()
-print("csvfile:", args.csvfile)
-
-csvfilebase = args.csvfile[:-4]
-outcsvfile = "{}_symik.csv".format(csvfilebase)
-
-print("computing manip to csv...")
-with open(args.csvfile, newline="") as csvfile:
-    i = 0
-    reader = csv.DictReader(csvfile)
-    for row in reader:
-        i += 1
-        # (x, y, z, w)
-        R = Rotation.from_quat([row["or_x"], row["or_y"], row["or_z"], row["or_w"]])
-        M = np.eye(4)
-        M[:3, :3] = R.as_matrix()
-        M[:3, 3] = np.array(
-            [
-                row["pos_x"],
-                row["pos_y"],
-                row["pos_z"],
-            ]
-        )
-        # print(M)
-        q, reachable, multiturn = ik.symbolic_inverse_kinematics("l_arm", M)
-
-        # tip = 'r_elbow_ball_link' # as frame
-        # tip = 'r_elbow_dummy_link'
-        # tip = 'r_shoulder_ball_link'
-        tip = "r_elbow_pitch"  # joint
-        # tip = None
-        fkk = fk(q, tip=tip)
-        # J = jacobian_frame(q, tip=tip)[:3, :]
-        J = jacobian_joint(q, tip=tip)[:3, :]
-        manipp = manip(J)  # TODO: NOT WORKING
-        rank = np.linalg.matrix_rank(J)
-        svalues = svals(J)
-        nsvalues = 2
-
-        # if manipp > 0.1:
-        #     print_all()
-        #     sys.exit(0)
-
-        def print_all():
-            print("rank", rank)
-            print("multiturn:", multiturn)
-            print("q:", q)
-            print("svalues:", svalues)
-            print("manip: {:.10f}".format(manipp))
-            print(fkk)
-            print(J)
-
-        if np.min(svalues[:nsvalues]) < 0.22:
-            print("-------------")
-            print("svalues LOWW i:", i)
-            print_all()
-
-        if rank != nsvalues:
-            print("------------------")
-            print("rank != J.shape[0] i:", i)
-            print_all()
-
-        if multiturn:
-            print("-------------")
-            print("multiturn detected!, i:", i)
-            print_all()

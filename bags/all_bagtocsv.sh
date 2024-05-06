@@ -15,8 +15,10 @@ if [ -d ${dirpath} ]; then
     mv -v ${dirpath}/* centrage_l_r/
     rmdir ${dirpath}
 fi
-./bagdir_to_csv.py centrage_l_r/
+./bagdir_to_csv.py centrage_l_r
 
+
+./verify_csvs.sh
 
 wc -l */*.csv
-ps -A | ag ros2
+ps -A | ag 'ros|python'
