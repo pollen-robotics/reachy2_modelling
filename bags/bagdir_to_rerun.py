@@ -23,8 +23,10 @@ print("bagdir:", args.bagdir)
 ########################
 # use new or old model
 rpp = rp
+torso_entity = "world/world_joint/base_link/back_bar_joint/back_bar/torso_base/torso"
 if args.old:
     rpp = oldrp
+    torso_entity = "world/world_joint/torso"
 ########################
 
 urdf_path = rpp.urdf_path
@@ -40,7 +42,7 @@ if args.web:
 rr.send_blueprint(ru.blueprint())
 
 print("urdflogger...")
-urdf_logger = URDFLogger(urdf_path)
+urdf_logger = URDFLogger(urdf_path, torso_entity)
 # urdfp_logger = URDFLogger("/home/user/pol/python-example-droid-dataset/franka_description/panda.urdf")
 # print(urdf_logger.entity_to_transform)
 # urdf_logger.log()

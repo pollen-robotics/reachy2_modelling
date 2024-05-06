@@ -164,8 +164,16 @@ class ArmHandler:
         model, data = self.modeldata()
         return rp.jacobian_frame(model, data, q, tip)
 
-    def manip(self, q, tip):
-        J = self.jacobian(q, tip)
+    def manip(self, q, tip, njoints=None):
+        if njoints is None:
+            njoints = 7
+        J = self.jacobian(q, tip)[:, :njoints]
+        return rp.manip(J)
+
+    def linmanip(self, q, tip, njoints=None):
+        if njoints is None:
+            njoints = 7
+        J = self.jacobian(q, tip)[:3, :njoints]
         return rp.manip(J)
 
     def log(self, epoch_s, ik, M, urdf_logger):
@@ -189,7 +197,11 @@ class ArmHandler:
                 tip = self.joints[dof - 1]
                 rr.log(
                     arm_entity(self.name, f"manip/{dof}dof"),
-                    rr.Scalar(self.manip(q, tip)),
+                    rr.Scalar(self.manip(q, tip, njoints=dof)),
+                )
+                rr.log(
+                    arm_entity(self.name, f"linmanip/{dof}dof"),
+                    rr.Scalar(self.manip(q, tip, njoints=dof)),
                 )
 
             # fk to compute error
@@ -200,8 +212,8 @@ class ArmHandler:
                 rr.log(entity, rr.Scalar(trans[i]))
 
             # sym ik stats
-            rr.log(arm_entity(self.name, "reachable"), rr.Scalar(reachable))
-            rr.log(arm_entity(self.name, "multiturn"), rr.Scalar(multiturn))
+            rr.log(arm_entity(self.name, "ik/reachable"), rr.Scalar(reachable))
+            rr.log(arm_entity(self.name, "ik/multiturn"), rr.Scalar(multiturn))
 
             # joint states
             for j, ang in enumerate(q):
@@ -226,23 +238,10 @@ class Scene:
         self.ik = MySymIK()
         self.larm = ArmHandler("l_arm", model_l_arm)
         self.rarm = ArmHandler("r_arm", model_r_arm)
-        # ├── action
-        # │   ├── target_cartesian_position <- includes orientation
-        # │   ├── joint_position
-        # │   └── joint_velocity
-        # └── observation
-        #     └── robot_state
-        #         ├── cartesian_position
-        #         ├── joint_positions       <- measured
-        #         └── joint_velocities      <- measured
 
-        # self.action = self.trajectory["action"]
-        # self.robot_state = self.trajectory["observation"]["robot_state"]
-        # self.trajectory_length = self.metadata["trajectory_length"]
-
-    def log_teleop(self, Ml, Mr):
+    def log_teleop(self, Ml, Mr, torso_entity):
         def pub(arm, M):
-            entity_base = f"world/world_joint/base_link/back_bar_joint/back_bar/torso_base/torso/{arm}_"
+            entity_base = f"{torso_entity}/{arm}_"
             if M is not None:
                 trans, R = M[:3, 3], M[:3, :3]
                 entity = entity_base + "target_pose"
@@ -272,12 +271,9 @@ class Scene:
 
             Ml, Mr = series_to_target_mat(series)
 
-            self.log_teleop(Ml, Mr)
+            self.log_teleop(Ml, Mr, urdf_logger.torso_entity)
             self.larm.log(epoch_s, self.ik, Ml, urdf_logger)
             self.rarm.log(epoch_s, self.ik, Mr, urdf_logger)
-
-            # self.log_action(i)
-            # self.log_robot_state(urdf_logger.entity_to_transform)
 
 
 def teleop_arm_entity(name, i):
@@ -297,10 +293,18 @@ def arm_qd_entity(name, i):
 
 
 def teleop_blueprint():
-    return Vertical(
-        TimeSeriesView(origin=teleop_arm_entity("l_arm", "")),
-        TimeSeriesView(origin=teleop_arm_entity("r_arm", "")),
-        name="target_position",
+    return Tabs(
+        Horizontal(
+            TimeSeriesView(origin=teleop_arm_entity("l_arm", "")),
+            TimeSeriesView(origin=teleop_arm_entity("r_arm", "")),
+            name="teleop_position",
+        ),
+        Horizontal(
+            TimeSeriesView(origin=arm_entity("l_arm", "ik")),
+            TimeSeriesView(origin=arm_entity("r_arm", "ik")),
+            name="IK Stats",
+        ),
+        active_tab=1,
     )
 
 
@@ -325,7 +329,12 @@ def debug_tab():
         Horizontal(
             TimeSeriesView(origin=arm_entity("l_arm", f"manip/")),
             TimeSeriesView(origin=arm_entity("r_arm", f"manip/")),
-            name="manipulability",
+            name="full manipulability",
+        ),
+        Horizontal(
+            TimeSeriesView(origin=arm_entity("l_arm", f"linmanip/")),
+            TimeSeriesView(origin=arm_entity("r_arm", f"linmanip/")),
+            name="linear manipulability",
         ),
         Horizontal(
             TimeSeriesView(origin=arm_qd_entity("l_arm", 2)),
@@ -349,7 +358,7 @@ def blueprint():
                     arm_joints_tab("l_arm"),
                     arm_joints_tab("r_arm"),
                     debug_tab(),
-                    active_tab=1,
+                    active_tab=2,
                 ),
             ),
             column_shares=[1.3, 2],

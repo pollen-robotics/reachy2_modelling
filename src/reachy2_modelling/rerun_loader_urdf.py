@@ -23,12 +23,13 @@ from .kdl_parser_py.urdf_parser_py import urdf as urdf_parser
 class URDFLogger:
     """Class to log a URDF to Rerun."""
 
-    def __init__(self, filepath: str, root_path: str = "") -> None:
+    def __init__(self, filepath: str, torso_entity, root_path: str = "") -> None:
         self.urdf = urdf_parser.URDF.from_xml_file(filepath)
         self.mat_name_to_mat = {mat.name: mat for mat in self.urdf.materials}
         self.entity_to_transform = {}
         self.root_path = root_path
         self.joint_entity_paths = {}
+        self.torso_entity = torso_entity
 
     def link_entity_path(self, link: urdf_parser.Link) -> str:
         """Return the entity path for the URDF link."""

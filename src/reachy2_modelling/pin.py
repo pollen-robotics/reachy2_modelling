@@ -55,8 +55,11 @@ def svals(J):
     return s
 
 
-def manip(J):
-    return np.sqrt(np.linalg.det(J.T @ J))
+def manip(J, eps=1e-6):
+    det = np.linalg.det(J.T @ J)
+    if det < 0 and det > -eps:
+        det = 0
+    return np.sqrt(det)
 
 
 def fk(model, data, q, tip, world_frame=False):
