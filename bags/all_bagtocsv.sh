@@ -16,8 +16,8 @@ if [ -d ${dirpath} ]; then
     rmdir ${dirpath}
 fi
 ./bagdir_to_csv.py centrage_l_r
-
 ./bagdir_to_csv.py multiturns
+./bagdir_to_csv.py unbiased
 
 ./verify_csvs.sh
 
