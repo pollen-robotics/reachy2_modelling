@@ -187,6 +187,7 @@ class ArmHandler:
                 dt = epoch_s - self.prev_epoch_s
                 qd = (q - self.prev_q) / dt
             else:
+                dt = 0
                 qd = np.zeros_like(q)
 
             self.prev_q = q
@@ -214,6 +215,7 @@ class ArmHandler:
             # sym ik stats
             rr.log(arm_entity(self.name, "ik/reachable"), rr.Scalar(reachable))
             rr.log(arm_entity(self.name, "ik/multiturn"), rr.Scalar(multiturn))
+            rr.log(arm_entity(self.name, "ik/dt"), rr.Scalar(dt))
 
             # joint states
             for j, ang in enumerate(q):
@@ -303,10 +305,12 @@ def teleop_blueprint():
             Vertical(
                 TimeSeriesView(origin=arm_entity("l_arm", "ik/reachable")),
                 TimeSeriesView(origin=arm_entity("l_arm", "ik/multiturn")),
+                TimeSeriesView(origin=arm_entity("l_arm", "ik/dt")),
             ),
             Vertical(
                 TimeSeriesView(origin=arm_entity("r_arm", "ik/reachable")),
                 TimeSeriesView(origin=arm_entity("r_arm", "ik/multiturn")),
+                TimeSeriesView(origin=arm_entity("r_arm", "ik/dt")),
             ),
             name="IK Stats",
         ),
