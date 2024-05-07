@@ -7,3 +7,4 @@ set -x
 ./bagdir_to_csv.py subset5 --verify
 ./bagdir_to_csv.py subset6 --verify
 ./bagdir_to_csv.py centrage_l_r --verify
+./bagdir_to_csv.py multiturns --verify

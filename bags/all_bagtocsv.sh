@@ -17,6 +17,7 @@ if [ -d ${dirpath} ]; then
 fi
 ./bagdir_to_csv.py centrage_l_r
 
+./bagdir_to_csv.py multiturns
 
 ./verify_csvs.sh
 

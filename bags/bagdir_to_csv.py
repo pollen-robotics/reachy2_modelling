@@ -3,6 +3,8 @@ import argparse
 import os
 import subprocess
 
+import yaml
+
 
 def flines(fname):
     return sum(1 for _ in open(fname))
@@ -11,6 +13,83 @@ def flines(fname):
 def blank(fname):
     with open(fname, "w") as f:
         f.write("")
+
+
+def verify(source, lcount, rcount, lexpected, rexpected):
+    lcount_correct = True
+    rcount_correct = True
+
+    def err_msg(arm, count, expected):
+        print(f"Warning: {arm} count is wrong, it is {count} instead of {expected}")
+        print(f"source of expected: {source}")
+        print(10 * "X")
+        return False
+
+    def ok_msg(arm, count, expected):
+        print(f"{arm} count is OK {count} = {expected} (source: {source})")
+        return True
+
+    func = err_msg
+    if lcount == lexpected:
+        func = ok_msg
+    lcount_correct = func("l_arm", lcount, lexpected)
+
+    func = err_msg
+    if rcount == rexpected:
+        func = ok_msg
+    rcount_correct = func("r_arm", rcount, rexpected)
+
+    return rcount_correct and lcount_correct
+
+
+def metadata_arm_message_count(bagdir):
+    metadatafile = os.path.join(bagdir, "metadata.yaml")
+    with open(metadatafile, "r") as f:
+        metadata = yaml.safe_load(f)
+
+    larm_count = None
+    rarm_count = None
+    topics = metadata["rosbag2_bagfile_information"]["topics_with_message_count"]
+    for topic in topics:
+        topicmeta = topic["topic_metadata"]
+        if "l_arm" in topicmeta["name"]:
+            larm_count = topic["message_count"]
+        if "r_arm" in topicmeta["name"]:
+            rarm_count = topic["message_count"]
+
+    if larm_count is None or rarm_count is None:
+        print(
+            f"{metadatafile} does not contain message count for larm ({larm_count}) or rarm ({rarm_count})"
+        )
+        exit(1)
+
+    return larm_count, rarm_count
+
+
+def sqlite_arm_message_count(bagdir):
+    sqlcmd = "SELECT topics.id, topics.name, count(messages.topic_id) from topics, messages where messages.topic_id=topics.id and (topics.name='/l_arm/target_pose' or topics.name='/r_arm/target_pose')  group by topics.name;"
+    print(25 * "-")
+    dirr = args.bagdir
+    dbs = [
+        fname
+        for fname in os.listdir(dirr)
+        if os.path.isfile(os.path.join(dirr, fname)) and fname.endswith(".db3")
+    ]
+    if len(dbs) > 1:
+        print("Error: multiple dbs found in bagdir?:", dbs)
+        exit(1)
+
+    cmd = f'sqlite3 {args.bagdir}/{dbs[0]} "{sqlcmd}"'
+    # print(cmd)
+    rawstr = subprocess.check_output(cmd, shell=True).strip().decode("utf-8")
+    larm_inline = ["l_arm" in line for line in rawstr.split("\n")]
+    linecount_pertopic = [int(line.split("|")[-1]) for line in rawstr.split("\n")]
+    assert len(larm_inline) == len(linecount_pertopic)
+    assert len(larm_inline) == 2
+    larm_count = linecount_pertopic[larm_inline.index(True)]
+    rarm_count = linecount_pertopic[larm_inline.index(False)]
+
+    return larm_count, rarm_count
 
 
 parser = argparse.ArgumentParser()
@@ -74,45 +153,34 @@ else:
 # cmd = f"wc -l {larmf} {rarmf}"
 # print(subprocess.check_output(cmd, shell=True).rstrip().decode("utf-8"))
 
-sqlcmd = "SELECT topics.id, topics.name, count(messages.topic_id) from topics, messages where messages.topic_id=topics.id group by topics.name;"
+count_correct = True
+larm_csv_count = flines(larmf) - 1
+rarm_csv_count = flines(rarmf) - 1
 try:
     subprocess.check_output(["which", "sqlite3"])
 except subprocess.CalledProcessError:
     print("sqlite3 not found, can't verify rosbag size")
-    if args.verify:
-        exit(1)
     exit(0)
+else:
+    larm_sql_msgcount, rarm_sql_msgcount = sqlite_arm_message_count(args.bagdir)
+    count_correct = verify(
+        source="sqlite",
+        lcount=larm_csv_count,
+        lexpected=larm_sql_msgcount,
+        rcount=rarm_csv_count,
+        rexpected=rarm_sql_msgcount,
+    )
+    print(25 * "-")
 
-print(25 * "-")
-dirr = args.bagdir
-dbs = [
-    fname
-    for fname in os.listdir(dirr)
-    if os.path.isfile(os.path.join(dirr, fname)) and fname.endswith(".db3")
-]
-if len(dbs) > 1:
-    print("Error: multiple dbs found in bagdir?:", dbs)
-    exit(1)
 
-cmd = f"sqlite3 {args.bagdir}/{dbs[0]} '{sqlcmd}'"
-# print(cmd)
-rawstr = subprocess.check_output(cmd, shell=True).strip().decode("utf-8")
-larm_inline = ["l_arm" in line for line in rawstr.split("\n")]
-linecount_pertopic = [int(line.split("|")[-1]) for line in rawstr.split("\n")]
-assert len(larm_inline) == len(linecount_pertopic)
-
-count_correct = True
-for larm_flag, count in zip(larm_inline, linecount_pertopic):
-    armf = larmf if larm_flag else rarmf
-    result = flines(armf) - 1  # -1 from header
-    if result != count:
-        count_correct = False
-        print(10 * "X")
-        print(
-            f"Warning: {'l_arm' if larm_flag else 'r_arm'} count is wrong, it is {result} instead of {count}"
-        )
-    else:
-        print(f"{'l_arm' if larm_flag else 'r_arm'} count is OK {result} = {count}")
+larm_meta_msgcount, rarm_meta_msgcount = metadata_arm_message_count(args.bagdir)
+count_correct = verify(
+    source="metadata.yaml",
+    lcount=larm_csv_count,
+    lexpected=larm_meta_msgcount,
+    rcount=rarm_csv_count,
+    rexpected=rarm_meta_msgcount,
+)
 print(25 * "-")
 
 if args.verify and not count_correct:
