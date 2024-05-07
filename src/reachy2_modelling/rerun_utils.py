@@ -202,7 +202,7 @@ class ArmHandler:
                 )
                 rr.log(
                     arm_entity(self.name, f"linmanip/{dof}dof"),
-                    rr.Scalar(self.manip(q, tip, njoints=dof)),
+                    rr.Scalar(self.linmanip(q, tip, njoints=dof)),
                 )
 
             # fk to compute error
@@ -229,7 +229,7 @@ class Scene:
     # https://github.com/rerun-io/python-example-droid-dataset/
     dir_path: Path
 
-    def __init__(self, dir_path: Path, model_l_arm, model_r_arm):
+    def __init__(self, dir_path: Path, model_l_arm, model_r_arm, shoulder_offset=None):
         self.dir_path = dir_path
 
         larmf = os.path.join(dir_path, "l_arm_target_pose.csv")
@@ -237,7 +237,8 @@ class Scene:
         print("csv files:", larmf, rarmf)
         self.df = df_target_poses(larmf, rarmf)
 
-        self.ik = MySymIK()
+        print("shoulder offest:", shoulder_offset)
+        self.ik = MySymIK(shoulder_offset=shoulder_offset)
         self.larm = ArmHandler("l_arm", model_l_arm)
         self.rarm = ArmHandler("r_arm", model_r_arm)
 
@@ -272,7 +273,6 @@ class Scene:
                 # exit(0)
 
             Ml, Mr = series_to_target_mat(series)
-
             self.log_teleop(Ml, Mr, urdf_logger.torso_entity)
             self.larm.log(epoch_s, self.ik, Ml, urdf_logger)
             self.rarm.log(epoch_s, self.ik, Mr, urdf_logger)
@@ -341,11 +341,11 @@ def debug_tab():
             TimeSeriesView(origin=arm_entity("r_arm", f"manip/")),
             name="full manipulability",
         ),
-        Horizontal(
-            TimeSeriesView(origin=arm_entity("l_arm", f"linmanip/")),
-            TimeSeriesView(origin=arm_entity("r_arm", f"linmanip/")),
-            name="linear manipulability",
-        ),
+        # Horizontal(
+        #     TimeSeriesView(origin=arm_entity("l_arm", f"linmanip/")),
+        #     TimeSeriesView(origin=arm_entity("r_arm", f"linmanip/")),
+        #     name="linear manipulability",
+        # ),
         Horizontal(
             Vertical(
                 TimeSeriesView(
@@ -370,7 +370,8 @@ def debug_tab():
             name="Qd2",
         ),
         name="debug",
-        row_shares=[1, 1, 2],
+        # row_shares=[1, 1, 1],
+        row_shares=[1, 1.6],
     )
 
 

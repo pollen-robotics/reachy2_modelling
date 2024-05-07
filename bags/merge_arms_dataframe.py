@@ -54,18 +54,18 @@ for i, index_series in enumerate(dflr.iterrows()):
     print("i", i, "index", index)
 
     larm_series = series[lcols]
-    print("l", larm_series)
+    print("l", larm_series.values)
     hasnan = larm_series.isnull().values.any()
     print("has nan:", hasnan)
     if not hasnan:
         print(coords_array_to_mat(larm_series.values))
 
     rarm_series = series[rcols]
-    print("r", rarm_series)
+    print("r", rarm_series.values)
     hasnan = rarm_series.isnull().values.any()
     print("has nan:", hasnan)
     if not hasnan:
         print(coords_array_to_mat(rarm_series.values))
-    if i > 4:
+    if i > 10:
         exit(0)
     print(10 * "-")

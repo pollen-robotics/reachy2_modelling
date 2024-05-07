@@ -17,21 +17,6 @@ from reachy2_symbolic_ik.utils import (
 )
 from scipy.spatial.transform import Rotation
 
-from .pin import (
-    fk,
-    jacobian_frame,
-    jacobian_joint,
-    manip,
-    model_l_arm,
-    model_r_arm,
-    svals,
-)
-
-np.set_printoptions(formatter={"float": lambda x: "{0:0.2f}".format(x)})
-
-model_larm, model_rarm = model_l_arm, model_r_arm
-data_larm, data_rarm = model_larm.createData(), model_rarm.createData()
-
 
 def inverse_kinematics(
     ik_solver, q0: np.ndarray, target_pose: np.ndarray, nb_joints: int
@@ -68,7 +53,10 @@ def get_euler_from_homogeneous_matrix(homogeneous_matrix, degrees: bool = False)
 
 class MySymIK:
 
-    def __init__(self):
+    def __init__(self, shoulder_offset=None):
+        if shoulder_offset is None:
+            shoulder_offset = [10, 0, 15]
+
         self.previous_theta = {}
         self.symbolic_ik_solver = {}
         self.previous_sol = {}
@@ -87,7 +75,7 @@ class MySymIK:
                 gripper_size=0.10,
                 wrist_limit=45,
                 # This is the "correct" stuff for alpha
-                shoulder_orientation_offset=[10, 0, 15],
+                shoulder_orientation_offset=shoulder_offset,
                 # This is the "wrong" values currently used by the alpha
                 # shoulder_orientation_offset=[0, 0, 15],
                 # shoulder_position=[-0.0479, -0.1913, 0.025],

@@ -8,13 +8,13 @@ from pathlib import Path
 import numpy as np
 import pinocchio as pin
 
-tmp = tempfile.NamedTemporaryFile()
-
 original_urdf_path = str(
     Path(__file__).parent / "reachy2_rerun_test" / "reachy_v2_fix.urdf"
 )
 original_urdf_str = open(original_urdf_path).read()
 
+##################################
+# adapt paths
 urdf_str = copy(original_urdf_str)
 
 toreplace = "reachy_description"
@@ -25,15 +25,12 @@ toreplace = "arm_description"
 urdf_str = urdf_str.replace(
     toreplace, str(Path(__file__).parent / "reachy2_rerun_test" / toreplace)
 )
+
+tmp = tempfile.NamedTemporaryFile(delete=False)
 urdf_path = tmp.name
-with open(tmp.name, "w") as f:
+with open(urdf_path, "w") as f:
     f.write(urdf_str)
-
-model = pin.buildModelFromXML(urdf_str)
-data = model.createData()
-
-# robot = pin.RobotWrapper.BuildFromURDF(urdf_path)
-# model, data = robot.model, robot.data
+##################################
 
 
 def jacobian_frame(model, data, q, tip=None):
@@ -94,20 +91,11 @@ def arm_joint_list(arm):
     return [arm + x for x in l_arm_joints_tokeep]
 
 
-l_arm_joints = arm_joint_list("l")
-r_arm_joints = arm_joint_list("r")
-head_joints = [
-    "neck_roll",
-    "neck_pitch",
-    "neck_yaw",
-]
-
-
 def add_framenames(model):
     model.frame_names = [x.name for x in model.frames.tolist()]
 
 
-def model_data_from_joints(model, joints_to_keep):
+def model_from_joints(model, joints_to_keep):
     all_joints = model.names.tolist()
     tolock = []
     for joint in all_joints:
@@ -126,26 +114,64 @@ def model_data_from_joints(model, joints_to_keep):
     model_reduced = pin.buildReducedModel(model, jointsToLockIDs, np.zeros(model.nq))
     add_framenames(model)
 
-    return model_reduced, model_reduced.createData()
+    return model_reduced
 
 
 def arm_from_urdfstr(urdfstr, arm):
     model = pin.buildModelFromXML(urdfstr)
     arm_joints = arm_joint_list(arm)
-    model, _ = model_data_from_joints(model, arm_joints)
+    model = model_from_joints(model, arm_joints)
     return model
 
 
 def head_from_urdfstr(urdfstr):
     model = pin.buildModelFromXML(urdfstr)
-    model, _ = model_data_from_joints(model, head_joints)
+    model = model_from_joints(model, head_joints)
     return model
 
 
-# model_head = head_from_urdfstr(urdf_str)
-# model_l_arm = arm_from_urdfstr(urdf_str, 'l')
-# model_r_arm = arm_from_urdfstr(urdf_str, 'r')
+l_arm_joints = arm_joint_list("l")
+r_arm_joints = arm_joint_list("r")
+head_joints = [
+    "neck_roll",
+    "neck_pitch",
+    "neck_yaw",
+]
 
-model_l_arm, data_l_arm = model_data_from_joints(model, l_arm_joints)
-model_r_arm, data_r_arm = model_data_from_joints(model, r_arm_joints)
-model_head, data_head = model_data_from_joints(model, head_joints)
+
+def offset_urdf(roll, pitch, yaw):
+    new_urdf_str = copy(urdf_str)
+    roll = np.deg2rad(roll)
+    pitch = np.deg2rad(pitch)
+    yaw = np.deg2rad(yaw)
+
+    # larm
+    tosearch = (
+        '<origin rpy="-1.7453292519943295 0 -0.2617993877991494" xyz="0.0 0.2 0.0"/>'
+    )
+    toreplace = f'<origin rpy="{-np.pi/2 -roll} 0 {-yaw}" xyz="0.0 0.2 0.0"/>'
+    new_urdf_str = new_urdf_str.replace(tosearch, toreplace)
+
+    # rarm
+    tosearch = (
+        '<origin rpy="1.7453292519943295 0 0.2617993877991494" xyz="0.0 -0.2 0.0"/>'
+    )
+    toreplace = f'<origin rpy="{np.pi/2 + roll} 0 {yaw}" xyz="0.0 -0.2 0.0"/>'
+    new_urdf_str = new_urdf_str.replace(tosearch, toreplace)
+
+    tmp = tempfile.NamedTemporaryFile(delete=False)
+    new_urdf_file = tmp.name
+    with open(new_urdf_file, "w") as f:
+        f.write(new_urdf_str)
+    return new_urdf_str, new_urdf_file
+
+
+class Models:
+    def __init__(self, urdf_str):
+        self.body = pin.buildModelFromXML(urdf_str)
+        self.l_arm = model_from_joints(self.body, l_arm_joints)
+        self.r_arm = model_from_joints(self.body, r_arm_joints)
+        self.head = model_from_joints(self.body, head_joints)
+
+
+models = Models(urdf_str)

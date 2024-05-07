@@ -9,6 +9,9 @@ pycapacity
 scipy<=1.11 # remove after roboticstoolbox-python fixes #412
 black
 isort
-pandas
-rerun-sdk
 plotly
+pandas
+# rerun stuff
+rerun-sdk
+trimesh
+pycollada
