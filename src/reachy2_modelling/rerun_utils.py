@@ -105,7 +105,14 @@ def df_target_poses(larmf, rarmf):
     dfl = dfl.set_index("epoch_s", verify_integrity=True)
     dfr = pd.read_csv(rarmf)
     dfr = dfr.set_index("epoch_s", verify_integrity=True)
+    return dfl, dfr
 
+
+def df_add_relative_time(df):
+    df["time"] = df.index - df.index[0]
+
+
+def df_merge(dfl, dfr):
     return dfl.join(dfr, lsuffix="_left", rsuffix="_right", how="outer")
 
 
@@ -176,9 +183,12 @@ class ArmHandler:
         J = self.jacobian(q, tip)[:3, :njoints]
         return rp.manip(J)
 
+    def ik(self, ik, M):
+        return ik.symbolic_inverse_kinematics(self.name, M)
+
     def log(self, epoch_s, ik, M, urdf_logger):
         if M is not None:
-            q, reachable, multiturn = ik.symbolic_inverse_kinematics(self.name, M)
+            q, reachable, multiturn = self.ik(ik, M)
 
             for joint_idx, angle in enumerate(q):
                 urdf_logger.log_joint_angle(self.njoint_name(joint_idx), angle)
@@ -235,7 +245,7 @@ class Scene:
         larmf = os.path.join(dir_path, "l_arm_target_pose.csv")
         rarmf = os.path.join(dir_path, "r_arm_target_pose.csv")
         print("csv files:", larmf, rarmf)
-        self.df = df_target_poses(larmf, rarmf)
+        self.df = df_merge(*df_target_poses(larmf, rarmf))
 
         print("shoulder offest:", shoulder_offset)
         self.ik = MySymIK(shoulder_offset=shoulder_offset)

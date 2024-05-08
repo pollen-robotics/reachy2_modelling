@@ -40,8 +40,7 @@ def jacobian_frame(model, data, q, tip=None):
     )
 
 
-def jacobian_joint(q, modeldata, tip):
-    [model, data] = modeldata
+def jacobian_joint(q, model, data, tip):
     joint_id = model.getJointId(tip)
     J = pin.computeJointJacobian(model, data, q, joint_id)
     return J

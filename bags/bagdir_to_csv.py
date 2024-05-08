@@ -160,7 +160,6 @@ try:
     subprocess.check_output(["which", "sqlite3"])
 except subprocess.CalledProcessError:
     print("sqlite3 not found, can't verify rosbag size")
-    exit(0)
 else:
     larm_sql_msgcount, rarm_sql_msgcount = sqlite_arm_message_count(args.bagdir)
     count_correct = verify(
