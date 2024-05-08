@@ -7,6 +7,9 @@ import yaml
 
 
 def flines(fname):
+    if not os.path.isfile(fname):
+        print(f"{fname} not found")
+        return 0
     return sum(1 for _ in open(fname))
 
 
@@ -42,8 +45,12 @@ def verify(source, lcount, rcount, lexpected, rexpected):
     return rcount_correct and lcount_correct
 
 
+def metadatapath(bagdir):
+    return os.path.join(bagdir, "metadata.yaml")
+
+
 def metadata_arm_message_count(bagdir):
-    metadatafile = os.path.join(bagdir, "metadata.yaml")
+    metadatafile = metadatapath(bagdir)
     with open(metadatafile, "r") as f:
         metadata = yaml.safe_load(f)
 
@@ -159,7 +166,7 @@ rarm_csv_count = flines(rarmf) - 1
 try:
     subprocess.check_output(["which", "sqlite3"])
 except subprocess.CalledProcessError:
-    print("sqlite3 not found, can't verify rosbag size")
+    print("sqlite3 not found, can't verify from database, will try using metadata")
 else:
     larm_sql_msgcount, rarm_sql_msgcount = sqlite_arm_message_count(args.bagdir)
     count_correct = verify(
@@ -172,15 +179,24 @@ else:
     print(25 * "-")
 
 
-larm_meta_msgcount, rarm_meta_msgcount = metadata_arm_message_count(args.bagdir)
-count_correct = verify(
-    source="metadata.yaml",
-    lcount=larm_csv_count,
-    lexpected=larm_meta_msgcount,
-    rcount=rarm_csv_count,
-    rexpected=rarm_meta_msgcount,
-)
-print(25 * "-")
+try:
+    larm_meta_msgcount, rarm_meta_msgcount = metadata_arm_message_count(args.bagdir)
+except FileNotFoundError as e:
+    metadatafile = metadatapath(args.bagdir)
+    print(e)
+    print(f"{metadatafile} not found, is {args.bagdir} the correct path?")
+    if args.verify:
+        exit(1)
+else:
+    count_correct = verify(
+        source="metadata.yaml",
+        lcount=larm_csv_count,
+        lexpected=larm_meta_msgcount,
+        rcount=rarm_csv_count,
+        rexpected=rarm_meta_msgcount,
+    )
+finally:
+    print(25 * "-")
 
 if args.verify and not count_correct:
     exit(1)

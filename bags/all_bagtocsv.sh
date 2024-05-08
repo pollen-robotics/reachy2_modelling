@@ -1,7 +1,9 @@
 #!/usr/bin/bash
 set -xe
 
+GLOBIGNORE="*simpletest*"
 rm -vf */*.csv
+unset GLOBIGNORE
 
 ./bagdir_to_csv.py subset
 ./bagdir_to_csv.py subset2

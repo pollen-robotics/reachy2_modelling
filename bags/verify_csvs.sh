@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-set -x
+set -xe
 
 ./bagdir_to_csv.py subset --verify
 ./bagdir_to_csv.py subset2 --verify
