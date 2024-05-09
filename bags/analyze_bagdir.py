@@ -20,6 +20,7 @@ import reachy2_modelling.pin as rp
 import reachy2_modelling.rerun_utils as ru
 from reachy2_modelling.old.symik import MySymIK
 
+plt.rcParams["figure.constrained_layout.use"] = True
 np.set_printoptions(formatter={"float": lambda x: "{0:0.2f}".format(x)})
 pd.set_option("display.precision", 2)
 
@@ -27,6 +28,164 @@ qcols = [f"q{x+1}" for x in np.arange(7)]
 qdcols = [f"qd{x+1}" for x in np.arange(7)]
 
 results = None
+
+
+def arm_graphs(df, arm_name, no_joints, images, bagdir):
+    bins = 10
+    alpha = 0.6
+    # bbox_to_anchor = (0.5, 1.03)
+    bbox_to_anchor = None
+    # legend_loc = "lower center"
+    legend_loc = "upper right"
+    legend_ncols = 4
+    rwidth = 7
+    figsize = (20, 11)
+    dpi = 300
+
+    subplot_cols = 5 - no_joints * 2
+
+    fig1, axes1 = plt.subplots(4, subplot_cols)
+    axes1 = np.array(axes1)
+    fig1.suptitle(f"{bagdir}: {arm_name} joints 1,2,3,4")
+
+    # q1 qd1 hist_qd1 manip2 linmanip2
+    # q2 qd2 hist_qd2 manip3 linmanip3
+    # q3 qd3 hist_qd3 manip4 linmanip4
+    # q4 qd4 hist_qd4 reach  multiturn
+
+    def data_to_plot(col):
+        datas = df.groupby("offset")[col]
+        labels = [x[0] for x in datas]
+        dataseries = [x[1] for x in datas]
+        ordered_labels = ["beta", "straight", "backwards", "upwards"]
+        ordered_dataseries = []
+        for label in ordered_labels:
+            idx = labels.index(label)
+            ordered_dataseries.append(dataseries[idx])
+        assert len(dataseries) == len(ordered_dataseries)
+        assert len(labels) == len(ordered_labels)
+        return ordered_dataseries, ordered_labels
+
+    def plot(ax, dataseries, labels, title, xlabel=None, ylabel=None):
+        ax.set_title(title)
+        datas = [x.values for x in dataseries]
+        times = [x[1].values for x in df.groupby("offset")["time"]]
+
+        ax.plot(
+            np.array(times).T,
+            np.array(datas).T,
+            alpha=alpha,
+            label=labels,
+        )
+        if xlabel is not None:
+            ax.set_xlabel(xlabel)
+        if ylabel is not None:
+            ax.set_ylabel(ylabel)
+        ax.grid()
+
+    def hist_qd(ax, dataseries, labels, title, quantmin=0.1, quantmax=0.9):
+        hist(
+            ax,
+            dataseries,
+            labels,
+            title,
+            xlabel="rad/s",
+            quantmin=quantmin,
+            quantmax=quantmax,
+        )
+
+    def hist(ax, dataseries, labels, title, xlabel=None, quantmin=0, quantmax=1):
+        ax.set_title(title)
+        data = [
+            x[x.between(x.quantile(quantmin), x.quantile(quantmax))].values
+            for x in dataseries
+        ]
+        # data = [x.values for x in dataseries]
+        weights = [np.ones(len(x)) / len(x) for x in data]
+        ax.hist(
+            data,
+            bins,
+            alpha=alpha,
+            label=labels,
+            weights=weights,
+            rwidth=rwidth,
+        )
+        ax.yaxis.set_major_formatter(PercentFormatter(1))
+        if xlabel is not None:
+            ax.set_xlabel(xlabel)
+        ax.grid()
+
+    for row in range(4):
+        xlabel = "[s]"
+        if not no_joints:
+            var, ylabel = f"q{row+1}", "rad"
+            plot(axes1[row, 0], *data_to_plot(var), var, xlabel, ylabel)
+            var, ylabel = f"qd{row+1}", "rad/s"
+            plot(axes1[row, 1], *data_to_plot(var), var, xlabel, ylabel)
+        var = f"qd{row+1}"
+        hist_qd(axes1[row, 2 - no_joints * 2], *data_to_plot(var), var)
+
+    for row, dof in enumerate([2, 4, 7]):
+        var = f"linmanip{dof}"
+        hist(axes1[row, 3 - no_joints * 2], *data_to_plot(var), var)
+
+        var = f"manip{dof}"
+        hist(axes1[row, 4 - no_joints * 2], *data_to_plot(var), var)
+
+    var = "reachable"
+    plot(axes1[3, 3 - no_joints * 2], *data_to_plot(var), var)
+    var = "multiturn"
+    plot(axes1[3, 4 - no_joints * 2], *data_to_plot(var), var)
+
+    fig1.legend(
+        *axes1[0, 0].get_legend_handles_labels(),
+        loc=legend_loc,
+        ncol=legend_ncols,
+        bbox_to_anchor=bbox_to_anchor,
+    )
+    # fig1.tight_layout()
+    if images:
+        img_file = f"{bagdir}/{bagdir}_{arm_name}_joints1234.png"
+        print(f"saving image file {img_file}...")
+        fig1.set_size_inches(*figsize)
+        fig1.savefig(img_file, bbox_inches="tight", dpi=dpi)
+
+    fig2, axes2 = plt.subplots(4, subplot_cols)
+    fig2.suptitle(f"{bagdir}: {arm_name} wrist joints (5,6,7)")
+    for row in range(3):
+        xlabel = "s"
+        if not no_joints:
+            var, ylabel = f"q{row+1+3}", "rad"
+            plot(axes2[row, 0], *data_to_plot(var), var, xlabel, ylabel)
+            var, ylabel = f"qd{row+1}", "rad/s"
+            plot(axes2[row, 1], *data_to_plot(var), var, xlabel, ylabel)
+
+        var = f"qd{row+1}"
+        hist_qd(axes2[row, 2 - no_joints * 2], *data_to_plot(var), var)
+
+    for row, dof in enumerate([2, 4, 7]):
+        var = f"linmanip{dof}"
+        hist(axes2[row, 3 - no_joints * 2], *data_to_plot(var), var)
+
+        var = f"manip{dof}"
+        hist(axes2[row, 4 - no_joints * 2], *data_to_plot(var), var)
+
+    var = "reachable"
+    plot(axes2[3, 3 - no_joints * 2], *data_to_plot(var), var)
+    var = "multiturn"
+    plot(axes2[3, 4 - no_joints * 2], *data_to_plot(var), var)
+
+    fig2.legend(
+        *axes1[0, 0].get_legend_handles_labels(),
+        loc=legend_loc,
+        ncol=legend_ncols,
+        bbox_to_anchor=bbox_to_anchor,
+    )
+    if images:
+        img_file = f"{bagdir}/{bagdir}_{arm_name}_joints567.png"
+        print(f"saving image file {img_file}...")
+        fig2.set_size_inches(*figsize)
+        fig2.savefig(img_file, bbox_inches="tight", dpi=dpi)
 
 
 def histogram(results):
@@ -63,7 +222,7 @@ def histogram(results):
             # ax.grid()
 
         datal = ldf.groupby("offset")[col]
-        datar = ldf.groupby("offset")[col]
+        datar = rdf.groupby("offset")[col]
         hist(datal, axl)
         hist(datar, axr)
         # axr.legend(loc=legend_loc, bbox_to_anchor=bbox_to_anchor)
@@ -126,7 +285,7 @@ def histogram_qd(results):
                 ax.grid()
 
             datal = ldf.groupby("offset")[col]
-            datar = ldf.groupby("offset")[col]
+            datar = rdf.groupby("offset")[col]
             hist(datal, axl)
             hist(datar, axr)
 
@@ -139,7 +298,7 @@ def histogram_qd(results):
 
 def save_result(arm_name, offset_name, df):
     if "arm" not in df:
-        df["arm"] = arm.name
+        df["arm"] = arm_name
     if "offset" not in df:
         df["offset"] = offset_name
     df = df.set_index(["arm", "offset"], append=True)
@@ -190,7 +349,7 @@ def manip_factory(arm, tip, name, njoints, linear):
     def series_to_manip(series):
         q = series[qcols].values.astype(float)
         data = {}
-        data[name] = func(q, tip, njoints=dof)
+        data[name] = func(q, tip, njoints=njoints)
         return pd.Series(data=data)
 
     return series_to_manip
@@ -252,6 +411,13 @@ parser.add_argument("bagdir", type=str)
 parser.add_argument(
     "--force", action="store_true", help="force recomputing even if pkls are found"
 )
+parser.add_argument("--images", action="store_true", help="generate image files")
+parser.add_argument(
+    "--no-joints",
+    dest="no_joints",
+    action="store_true",
+    help="don't show joint q and qd in graphs",
+)
 parser.add_argument(
     "-i",
     "--interactive",
@@ -278,22 +444,78 @@ index_todatetime(csv_rdf)
 offsets = [
     ([10, 0, 15], "beta"),  # current: config 0
     ([0, 0, 0], "straight"),
-    ([10, 0, 15], "backwards"),
-    ([10, 0, 15], "upwards"),
+    ([0, 0, -5], "backwards"),
+    ([-10, 0, -5], "upwards"),
 ]
 
-for offset in offsets:
-    ik = MySymIK()
-    offset_name = offset[1]
+
+def process_arm(needs_processing, arm, df, ik, offset_name):
+    separate()
+    if not needs_processing:
+        print(f"skipping {arm.name} (loaded pkl)")
+        return df
+
+    print(f"processing {arm.name}...")
+
+    print("computing ik...")
+    df = pd.concat([df, df.apply(series_to_ik_factory(arm, ik), axis=1)], axis=1)
+
+    print("computing qdot...")
+    df = pd.concat([df, df.apply(series_to_qd, axis=1)], axis=1)
+
+    print("computing manipulability...")
+    dofs = [2, 4, 7]
+    for dof in dofs:
+        print(f"- dof:{dof}")
+        if dof != 7:
+            tip = arm.njoint_name(dof)
+        else:
+            tip = arm.tip
+        df = pd.concat(
+            [
+                df,
+                df.apply(
+                    manip_factory(
+                        arm,
+                        tip=tip,
+                        name=f"linmanip{dof}",
+                        njoints=dof,
+                        linear=True,
+                    ),
+                    axis=1,
+                ),
+            ],
+            axis=1,
+        )
+        df = pd.concat(
+            [
+                df,
+                df.apply(
+                    manip_factory(
+                        arm, tip=tip, name=f"manip{dof}", njoints=dof, linear=False
+                    ),
+                    axis=1,
+                ),
+            ],
+            axis=1,
+        )
+
+    pkl_fname = pklpath(args.bagdir, offset_name, arm.name)
+    print(f"saving {pkl_fname}...")
+    df.to_pickle(pkl_fname)
+    return df
+
+
+def process_offset(offset_params, arm_name):
+    offset_name = offset_params[1]
     separate_big()
     print(f"processing offset named {offset_name}...")
 
-    roll, pitch, yaw = [*offset[0]]
+    roll, pitch, yaw = [*offset_params[0]]
     print("RPY:", roll, pitch, yaw)
-    urdf_str, urdf_path = rp.offset_urdf(roll, pitch, yaw)
+    ik = MySymIK(shoulder_offset=[roll, pitch, yaw])
+    urdf_str, _ = rp.offset_urdf(roll, pitch, yaw)
     models = rp.Models(urdf_str)
-    larm = ru.ArmHandler("l_arm", models.l_arm)
-    rarm = ru.ArmHandler("r_arm", models.r_arm)
 
     def load_or_copy(arm, csvdf, force_processing):
         needs_processing = False
@@ -307,71 +529,57 @@ for offset in offsets:
             needs_processing = True
         return df, needs_processing
 
-    ldf, lneeds_processing = load_or_copy(larm, csv_ldf, args.force)
-    rdf, rneeds_processing = load_or_copy(rarm, csv_rdf, args.force)
+    if arm_name == "l_arm":
+        larm = ru.ArmHandler("l_arm", models.l_arm)
+        ldf, lneeds_processing = load_or_copy(larm, csv_ldf, args.force)
+        needs_processing, arm, df = lneeds_processing, larm, ldf
+        save_result(
+            arm.name,
+            offset_name,
+            process_arm(needs_processing, arm, df, ik, offset_name),
+        )
+    elif arm_name == "r_arm":
+        rarm = ru.ArmHandler("r_arm", models.r_arm)
+        rdf, rneeds_processing = load_or_copy(rarm, csv_rdf, args.force)
+        needs_processing, arm, df = rneeds_processing, rarm, rdf
+        save_result(
+            arm.name,
+            offset_name,
+            process_arm(needs_processing, arm, df, ik, offset_name),
+        )
+    else:
+        print(f"Error: unknown arm_name {arm_name}")
+        exit(1)
 
-    for needs_processing, arm, df in zip(
-        [lneeds_processing, rneeds_processing], [larm, rarm], [ldf, rdf]
-    ):
-        separate()
-        if not needs_processing:
-            print(f"skipping {arm.name} (loaded pkl)")
-            save_result(arm.name, offset_name, df)
-            continue
 
-        print(f"processing {arm.name}...")
+parameters = [
+    (offset_params, arm_name)
+    for offset_params, arm_name in zip(offsets, ["l_arm" for _ in offsets])
+]
+parameters += [
+    (offset_params, arm_name)
+    for offset_params, arm_name in zip(offsets, ["r_arm" for _ in offsets])
+]
 
-        print("computing ik...")
-        df = pd.concat([df, df.apply(series_to_ik_factory(arm, ik), axis=1)], axis=1)
 
-        print("computing qdot...")
-        df = pd.concat([df, df.apply(series_to_qd, axis=1)], axis=1)
+for offset_params, arm_name in parameters:
+    process_offset(offset_params, arm_name)
 
-        print("computing manipulability...")
-        dofs = [2, 4, 7]
-        for dof in dofs:
-            print(f"- dof:{dof}")
-            if dof != 7:
-                tip = arm.njoint_name(dof)
-            else:
-                tip = arm.tip
-            df = pd.concat(
-                [
-                    df,
-                    df.apply(
-                        manip_factory(
-                            arm,
-                            tip=tip,
-                            name=f"linmanip{dof}",
-                            njoints=dof,
-                            linear=True,
-                        ),
-                        axis=1,
-                    ),
-                ],
-                axis=1,
-            )
-            df = pd.concat(
-                [
-                    df,
-                    df.apply(
-                        manip_factory(
-                            arm, tip=tip, name=f"manip{dof}", njoints=dof, linear=False
-                        ),
-                        axis=1,
-                    ),
-                ],
-                axis=1,
-            )
+ldf = results[results.index.get_level_values("arm") == "l_arm"]
+rdf = results[results.index.get_level_values("arm") == "r_arm"]
+# histogram(results)
+# histogram_qd(results)
+arm_graphs(
+    ldf, "l_arm", no_joints=args.no_joints, images=args.images, bagdir=args.bagdir
+)
+arm_graphs(
+    rdf, "r_arm", no_joints=args.no_joints, images=args.images, bagdir=args.bagdir
+)
+if not args.images:
+    plt.show()
+else:
+    print("--images provided, image files were saved and will not be shown")
 
-        pkl_fname = pklpath(args.bagdir, offset_name, arm.name)
-        print(f"saving {pkl_fname}...")
-        df.to_pickle(pkl_fname)
-        save_result(arm.name, offset_name, df)
-
-histogram(results)
-histogram_qd(results)
-plt.show()
 
 if args.interactive:
     code.interact(local=dict(globals(), **locals()))

@@ -214,10 +214,10 @@ class MySymIK:
         for index in indexes_that_can_multiturn:
             if abs(new_joints[index]) > np.pi:
                 multiturn = True
-                print(
-                    f"Multiturn detected on joint {index} with value: {new_joints[index]} @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-                    f" {name} Multiturn detected on joint {index} with value: {new_joints[index]} @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-                )
+                # print(
+                # f"Multiturn detected on joint {index} with value: {new_joints[index]} @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+                # f" {name} Multiturn detected on joint {index} with value: {new_joints[index]} @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+                # )
                 # TEMP forbidding multiturn
                 # new_joints[index] = np.sign(new_joints[index]) * np.pi
         return new_joints, multiturn
