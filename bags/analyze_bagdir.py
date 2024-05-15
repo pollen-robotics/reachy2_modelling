@@ -37,7 +37,7 @@ def arm_graphs(df, arm_name, no_joints, images, bagdir):
     bbox_to_anchor = None
     # legend_loc = "lower center"
     legend_loc = "upper right"
-    legend_ncols = 4
+    legend_ncols = 10
     rwidth = 7
     figsize = (20, 11)
     dpi = 300
@@ -57,7 +57,7 @@ def arm_graphs(df, arm_name, no_joints, images, bagdir):
         datas = df.groupby("offset")[col]
         labels = [x[0] for x in datas]
         dataseries = [x[1] for x in datas]
-        ordered_labels = ["beta", "straight", "backwards", "upwards"]
+        ordered_labels = ["beta", "straight", "backwards", "upwards-20", "backo-upwards"]
         ordered_dataseries = []
         for label in ordered_labels:
             idx = labels.index(label)
@@ -445,7 +445,9 @@ offsets = [
     ([10, 0, 15], "beta"),  # current: config 0
     ([0, 0, 0], "straight"),
     ([0, 0, -5], "backwards"),
-    ([-10, 0, -5], "upwards"),
+    ([20, 0, 0], "upwards20"),
+    ([-20, 0, 0], "upwards-20"),
+    ([-10, 0, -5], "backo-upwards"),
 ]
 
 
