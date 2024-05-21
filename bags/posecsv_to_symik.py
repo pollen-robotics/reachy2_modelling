@@ -2,7 +2,6 @@
 
 import argparse
 import csv
-import sys
 from typing import Tuple
 
 import numpy as np

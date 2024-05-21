@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
 import argparse
-import os
-import subprocess
 
-import numpy as np
-import pandas as pd
 import rerun as rr
-from scipy.spatial.transform import Rotation
 
 import reachy2_modelling.old.pin as oldrp
 import reachy2_modelling.pin as rp

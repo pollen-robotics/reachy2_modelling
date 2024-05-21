@@ -1,6 +1,15 @@
 import numpy as np
 import pinocchio as pin
-import PyKDL as kdl
+
+try:
+    import PyKDL as kdl
+except ImportError as e:
+    print("Error:", e)
+    print(
+        "need PyKDL you can install it from the conda env (see env.yaml) or from apt with:"
+    )
+    print("sudo apt install python3-pykdl")
+    exit(1)
 
 try:
     import reachy2_modelling.old.kdl as rk
@@ -128,7 +137,7 @@ else:
         rk.chain_l_arm_torso
     )
 tip = "l_arm_tip"
-model, robot = rp.model_l_arm, rr.robot_l_arm
+model, robot = rp.models.l_arm, rr.robot_l_arm
 frames_names = [x.name for x in model.frames.tolist()]
 data = model.createData()
 q0 = np.random.rand(7)
@@ -144,7 +153,7 @@ else:
     fk_solver, kdl_world_frame = rk.fk_solver_r_arm_torso, rk.world_frame(
         rk.chain_r_arm_torso
     )
-model, robot = rp.model_r_arm, rr.robot_r_arm
+model, robot = rp.models.r_arm, rr.robot_r_arm
 data = model.createData()
 fk_all(fk_solver, model, data, robot, q0, tip, kdl_world_frame=kdl_world_frame)
 
@@ -156,6 +165,6 @@ else:
     fk_solver, kdl_world_frame = rk.fk_solver_head_torso, rk.world_frame(
         rk.chain_head_torso
     )
-model, robot = rp.model_head, rr.robot_head
+model, robot = rp.models.head, rr.robot_head
 data = model.createData()
 fk_all(fk_solver, model, data, robot, q0[:3], tip, kdl_world_frame=kdl_world_frame)

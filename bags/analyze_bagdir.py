@@ -1,17 +1,10 @@
 #!/usr/bin/env python3
 import argparse
 import code
-import csv
 import os
-import pickle
-import sys
-import types
-from typing import Tuple
 
 import numpy as np
 import pandas as pd
-import pinocchio as pin
-import PyKDL as kdl
 from matplotlib import pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from scipy.spatial.transform import Rotation
@@ -57,7 +50,13 @@ def arm_graphs(df, arm_name, no_joints, images, bagdir):
         datas = df.groupby("offset")[col]
         labels = [x[0] for x in datas]
         dataseries = [x[1] for x in datas]
-        ordered_labels = ["beta", "straight", "backwards", "upwards-20", "backo-upwards"]
+        ordered_labels = [
+            "beta",
+            "straight",
+            "backwards",
+            "upwards-20",
+            "backo-upwards",
+        ]
         ordered_dataseries = []
         for label in ordered_labels:
             idx = labels.index(label)

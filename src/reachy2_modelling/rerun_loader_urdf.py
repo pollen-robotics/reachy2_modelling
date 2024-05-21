@@ -10,7 +10,6 @@ import pathlib
 from typing import Optional
 
 import numpy as np
-import pinocchio as pin
 import rerun as rr  # pip install rerun-sdk
 import scipy.spatial.transform as st
 import trimesh

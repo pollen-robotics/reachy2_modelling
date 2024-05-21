@@ -1,5 +1,4 @@
 import collections
-import string
 from xml.dom import minidom
 from xml.etree import ElementTree as ET
 

@@ -1,4 +1,5 @@
 jupyter
+cgal
 pin
 example-robot-data
 meshcat
@@ -7,11 +8,13 @@ ipympl
 roboticstoolbox-python
 pycapacity >=2.1
 scipy<=1.11 # remove after roboticstoolbox-python fixes #412
-black
-isort
 plotly
 pandas
 # rerun stuff
-rerun-sdk >= 0.15
+rerun-sdk==0.15.1
 trimesh >= 4
 pycollada
+##################
+# for formatting and stuff
+black
+isort

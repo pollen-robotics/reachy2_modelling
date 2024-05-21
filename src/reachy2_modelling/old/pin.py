@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 
-import sys
 from pathlib import Path
 
-import numpy as np
 import pinocchio as pin
 
 from ..pin import Models

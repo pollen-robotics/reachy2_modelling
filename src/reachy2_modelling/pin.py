@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import sys
 import tempfile
 from copy import copy
 from pathlib import Path

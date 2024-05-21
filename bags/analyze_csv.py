@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
 import argparse
 import code
-import csv
 import os
-import pickle
 import sys
-import types
-from typing import Tuple
 
 import numpy as np
 import pandas as pd
-import pinocchio as pin
 import plotly.express as px
-import PyKDL as kdl
 from plotly.offline import plot
 from plotly.subplots import make_subplots
 from scipy.spatial.transform import Rotation

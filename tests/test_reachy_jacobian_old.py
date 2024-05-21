@@ -89,30 +89,33 @@ q0 = np.random.rand(7)
 separate()
 print("L ARM")
 jac_solver = rk.jac_solver_l_arm
-model, data = rp.model_l_arm, rp.data_l_arm
+model = rp.models.l_arm
+data = model.createData()
 # tip = 'l_wrist_yaw'
 # tip = 'l_hand_palm_link'
 tip = rr.robot_l_arm.ee_links_names[0]
 J = compute_jacs(q0, rr.robot_l_arm, jac_solver, model, data, tip)
 
-# separate()
-# print("R ARM")
-# jac_solver = rk.jac_solver_r_arm
-# model, data = rp.model_r_arm, rp.data_r_arm
-# # tip = 'r_wrist_yaw'
-# # tip = 'r_hand_palm_link'
-# tip = rr.robot_r_arm.ee_links_names[0]
-# compute_jacs(q0, rr.robot_r_arm, jac_solver, model, data, tip)
+separate()
+print("R ARM")
+jac_solver = rk.jac_solver_r_arm
+model = rp.models.r_arm
+data = model.createData()
+# tip = 'r_wrist_yaw'
+# tip = 'r_hand_palm_link'
+tip = rr.robot_r_arm.ee_links_names[0]
+compute_jacs(q0, rr.robot_r_arm, jac_solver, model, data, tip)
 
-# separate()
-# print("HEAD")
-# jac_solver = rk.jac_solver_head
-# model, data = rp.model_head, rp.data_head
-# # tip = 'neck_yaw'
-# # tip = 'head'
-# tip = rr.robot_head.ee_links_names[0]
-# compute_jacs(q0[:3], rr.robot_head, jac_solver, model, data, tip)
+separate()
+print("HEAD")
+jac_solver = rk.jac_solver_head
+model = rp.models.head
+data = model.createData()
+# tip = 'neck_yaw'
+# tip = 'head'
+tip = rr.robot_head.ee_links_names[0]
+compute_jacs(q0[:3], rr.robot_head, jac_solver, model, data, tip)
 
-# separate()
-# print("WARNING: rtb models do not coincide with the others so far")
-# separate()
+separate()
+print("WARNING: rtb models do not coincide with the others so far")
+separate()

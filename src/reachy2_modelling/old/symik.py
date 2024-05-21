@@ -1,12 +1,7 @@
-import argparse
 import copy
-import csv
-import sys
 import time
-from typing import Tuple
 
 import numpy as np
-import pinocchio as pin
 import PyKDL as kdl
 from reachy2_symbolic_ik.symbolic_ik import SymbolicIK
 from reachy2_symbolic_ik.utils import (
