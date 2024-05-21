@@ -18,3 +18,4 @@ pycollada
 # for formatting and stuff
 black
 isort
+# autoflake
