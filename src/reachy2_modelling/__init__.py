@@ -24,3 +24,5 @@ class Arm:
 import reachy2_modelling.old
 import reachy2_modelling.pin
 import reachy2_modelling.symik
+
+# import reachy2_modelling.ik

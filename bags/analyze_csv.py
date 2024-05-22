@@ -27,12 +27,12 @@ def print_all(dff):
         print(epoch_s, series.values)
 
 
-def manip_factory(modeldata, tip, name):
+def manip_factory(model, data, tip, name):
     def series_to_linmanip(series):
         q = series[qcols].values.astype(float)
-        J = jacobian_joint(q, modeldata=modeldata, tip=tip)[:3, :]
-        data = {}
-        data[name] = manip(J)
+        J = r2.pin.jacobian_joint(q, model, data, tip=tip)[:3, :]
+        dic = {}
+        dic[name] = r2.pin.manip(J)
         return pd.Series(data=data)
 
     return series_to_linmanip
@@ -40,7 +40,7 @@ def manip_factory(modeldata, tip, name):
 
 def series_to_ik(series):
     M = series_to_mat(series)
-    q, reachable, multiturn = ik.symbolic_inverse_kinematics(arm_str, M)
+    q, reachable, multiturn = r2.symik.SymArm(arm_str).ik(M)
 
     data = {}
     for i, ang in enumerate(q):
@@ -143,13 +143,15 @@ if df is None:
     df = pd.concat([df, df.apply(series_to_ik, axis=1)], axis=1)
     df = pd.concat([df, df.apply(series_to_qd, axis=1)], axis=1)
 
-    modeldata = (arm_model, arm_data)
     df = pd.concat(
         [
             df,
             df.apply(
                 manip_factory(
-                    modeldata, tip=correct_arm("l_elbow_pitch"), name="linmanip2"
+                    arm_model,
+                    arm_data,
+                    tip=correct_arm("l_elbow_pitch"),
+                    name="linmanip2",
                 ),
                 axis=1,
             ),
@@ -161,7 +163,10 @@ if df is None:
             df,
             df.apply(
                 manip_factory(
-                    modeldata, tip=correct_arm("l_elbow_yaw"), name="linmanip4"
+                    arm_model,
+                    arm_data,
+                    tip=correct_arm("l_elbow_yaw"),
+                    name="linmanip4",
                 ),
                 axis=1,
             ),
