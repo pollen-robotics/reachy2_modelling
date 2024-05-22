@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import rerun as rr
 from rerun.blueprint import (
@@ -15,9 +16,9 @@ from rerun.blueprint import (
     TimeSeriesView,
     Vertical,
 )
+from scipy.spatial.transform import Rotation
 
-import reachy2_modelling.pin as rp
-from reachy2_modelling.old.symik import *
+import reachy2_modelling as r2
 
 # ┌─────┬─────────────────────────┬───────┬───────────────────────┬──────────────────────────────────────────┐
 # │link │          link           │ joint │        parent         │           ETS: parent to link            │
@@ -116,82 +117,21 @@ def df_merge(dfl, dfr):
     return dfl.join(dfr, lsuffix="_left", rsuffix="_right", how="outer")
 
 
-class ArmHandler:
-    ljoints = [
-        "l_shoulder_pitch",
-        "l_shoulder_roll",
-        "l_elbow_yaw",
-        "l_elbow_pitch",
-        "l_wrist_roll",
-        "l_wrist_pitch",
-        "l_wrist_yaw",
-    ]
+class RRArm:
+    def __init__(self, name, pinmodel, shoulder_offset=None):
+        self.arm = r2.Arm(name)
+        self.symarm = r2.symik.SymArm(name, shoulder_offset=shoulder_offset)
+        self.pinarm = r2.pin.PinArm(name, pinmodel)
 
-    rjoints = [
-        "r_shoulder_pitch",
-        "r_shoulder_roll",
-        "r_elbow_yaw",
-        "r_elbow_pitch",
-        "r_wrist_roll",
-        "r_wrist_pitch",
-        "r_wrist_yaw",
-    ]
-
-    ltip = "l_arm_tip"
-    rtip = "r_arm_tip"
-
-    def __init__(self, name, model):
-        self.name = name
-        assert self.name == "l_arm" or self.name == "r_arm"
         self.prev_q = None
         self.prev_epoch_s = None
-        self.model = model
 
-        self.joints = self.rjoints
-        self.tip = self.rtip
-        if self.name == "l_arm":
-            self.joints = self.ljoints
-            self.tip = self.ltip
-
-    def modeldata(self):
-        return self.model, self.model.createData()
-
-    def njoint_name(self, n):
-        return self.joints[n]
-
-    def fk(self, q, tip=None, world=False):
-        if tip is None:
-            tip = self.tip
-        model, data = self.modeldata()
-        return rp.fk(model, data, q, tip, world)
-
-    def jacobian(self, q, tip=None):
-        if tip is None:
-            tip = self.tip
-        model, data = self.modeldata()
-        return rp.jacobian_frame(model, data, q, tip)
-
-    def manip(self, q, tip, njoints=None):
-        if njoints is None:
-            njoints = 7
-        J = self.jacobian(q, tip)[:, :njoints]
-        return rp.manip(J)
-
-    def linmanip(self, q, tip, njoints=None):
-        if njoints is None:
-            njoints = 7
-        J = self.jacobian(q, tip)[:3, :njoints]
-        return rp.manip(J)
-
-    def ik(self, ik, M):
-        return ik.symbolic_inverse_kinematics(self.name, M)
-
-    def log(self, epoch_s, ik, M, urdf_logger):
+    def log(self, epoch_s, M, urdf_logger):
         if M is not None:
-            q, reachable, multiturn = self.ik(ik, M)
+            q, reachable, multiturn = self.symarm.ik(M)
 
             for joint_idx, angle in enumerate(q):
-                urdf_logger.log_joint_angle(self.njoint_name(joint_idx), angle)
+                urdf_logger.log_joint_angle(self.pinarm.njoint_name(joint_idx), angle)
 
             if self.prev_q is not None:
                 dt = epoch_s - self.prev_epoch_s
@@ -205,33 +145,33 @@ class ArmHandler:
 
             # manipulability
             for dof in [2, 4, 7]:
-                tip = self.joints[dof - 1]
+                tip = self.pinarm.joints[dof - 1]
                 rr.log(
-                    arm_entity(self.name, f"manip/{dof}dof"),
-                    rr.Scalar(self.manip(q, tip, njoints=dof)),
+                    arm_entity(self.arm.name, f"manip/{dof}dof"),
+                    rr.Scalar(self.pinarm.manip(q, tip, njoints=dof)),
                 )
                 rr.log(
-                    arm_entity(self.name, f"linmanip/{dof}dof"),
-                    rr.Scalar(self.linmanip(q, tip, njoints=dof)),
+                    arm_entity(self.arm.name, f"linmanip/{dof}dof"),
+                    rr.Scalar(self.pinarm.linmanip(q, tip, njoints=dof)),
                 )
 
             # fk to compute error
-            Mcur = self.fk(q)
+            Mcur = self.pinarm.fk(q)
             trans, R = Mcur.translation, Mcur.rotation
             for i, coord in enumerate(["x", "y", "z"]):
-                entity = teleop_arm_entity(self.name, f"state_{coord}")
+                entity = teleop_arm_entity(self.arm.name, f"state_{coord}")
                 rr.log(entity, rr.Scalar(trans[i]))
 
             # sym ik stats
-            rr.log(arm_entity(self.name, "ik/reachable"), rr.Scalar(reachable))
-            rr.log(arm_entity(self.name, "ik/multiturn"), rr.Scalar(multiturn))
-            rr.log(arm_entity(self.name, "ik/dt"), rr.Scalar(dt))
+            rr.log(arm_entity(self.arm.name, "ik/reachable"), rr.Scalar(reachable))
+            rr.log(arm_entity(self.arm.name, "ik/multiturn"), rr.Scalar(multiturn))
+            rr.log(arm_entity(self.arm.name, "ik/dt"), rr.Scalar(dt))
 
             # joint states
             for j, ang in enumerate(q):
-                rr.log(arm_q_entity(self.name, j), rr.Scalar(ang))
+                rr.log(arm_q_entity(self.arm.name, j), rr.Scalar(ang))
             for j, vel in enumerate(qd):
-                rr.log(arm_qd_entity(self.name, j), rr.Scalar(vel))
+                rr.log(arm_qd_entity(self.arm.name, j), rr.Scalar(vel))
 
 
 class Scene:
@@ -248,9 +188,8 @@ class Scene:
         self.df = df_merge(*df_target_poses(larmf, rarmf))
 
         print("shoulder offest:", shoulder_offset)
-        self.ik = MySymIK(shoulder_offset=shoulder_offset)
-        self.larm = ArmHandler("l_arm", model_l_arm)
-        self.rarm = ArmHandler("r_arm", model_r_arm)
+        self.larm = RRArm("l_arm", model_l_arm, shoulder_offset=shoulder_offset)
+        self.rarm = RRArm("r_arm", model_r_arm, shoulder_offset=shoulder_offset)
 
     def log_teleop(self, Ml, Mr, torso_entity):
         def pub(arm, M):
@@ -284,8 +223,8 @@ class Scene:
 
             Ml, Mr = series_to_target_mat(series)
             self.log_teleop(Ml, Mr, urdf_logger.torso_entity)
-            self.larm.log(epoch_s, self.ik, Ml, urdf_logger)
-            self.rarm.log(epoch_s, self.ik, Mr, urdf_logger)
+            self.larm.log(epoch_s, Ml, urdf_logger)
+            self.rarm.log(epoch_s, Mr, urdf_logger)
 
 
 def teleop_arm_entity(name, i):

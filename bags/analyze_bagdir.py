@@ -9,9 +9,8 @@ from matplotlib import pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from scipy.spatial.transform import Rotation
 
-import reachy2_modelling.pin as rp
+import reachy2_modelling as r2
 import reachy2_modelling.rerun_utils as ru
-from reachy2_modelling.old.symik import MySymIK
 
 plt.rcParams["figure.constrained_layout.use"] = True
 np.set_printoptions(formatter={"float": lambda x: "{0:0.2f}".format(x)})
@@ -61,7 +60,9 @@ def arm_graphs(df, arm_name, no_joints, images, bagdir):
         for label in ordered_labels:
             idx = labels.index(label)
             ordered_dataseries.append(dataseries[idx])
-        assert len(dataseries) == len(ordered_dataseries)
+        assert len(dataseries) == len(
+            ordered_dataseries
+        ), "maybe need to --force a recompute"
         assert len(labels) == len(ordered_labels)
         return ordered_dataseries, ordered_labels
 
@@ -354,10 +355,10 @@ def manip_factory(arm, tip, name, njoints, linear):
     return series_to_manip
 
 
-def series_to_ik_factory(arm, ik):
+def series_to_ik_factory(symarm):
     def series_to_ik(series):
         M = series_to_mat(series)
-        q, reachable, multiturn = arm.ik(ik, M)
+        q, reachable, multiturn = symarm.ik(M)
 
         data = {}
         for i, ang in enumerate(q):
@@ -453,13 +454,15 @@ offsets = [
 def process_arm(needs_processing, arm, df, ik, offset_name):
     separate()
     if not needs_processing:
-        print(f"skipping {arm.name} (loaded pkl)")
+        print(f"skipping {arm.arm.name} (loaded pkl)")
         return df
 
-    print(f"processing {arm.name}...")
+    pinarm, symarm = arm.pinarm, arm.symarm
+
+    print(f"processing {arm.arm.name}...")
 
     print("computing ik...")
-    df = pd.concat([df, df.apply(series_to_ik_factory(arm, ik), axis=1)], axis=1)
+    df = pd.concat([df, df.apply(series_to_ik_factory(symarm), axis=1)], axis=1)
 
     print("computing qdot...")
     df = pd.concat([df, df.apply(series_to_qd, axis=1)], axis=1)
@@ -469,9 +472,9 @@ def process_arm(needs_processing, arm, df, ik, offset_name):
     for dof in dofs:
         print(f"- dof:{dof}")
         if dof != 7:
-            tip = arm.njoint_name(dof)
+            tip = pinarm.njoint_name(dof)
         else:
-            tip = arm.tip
+            tip = pinarm.tip
         df = pd.concat(
             [
                 df,
@@ -514,15 +517,15 @@ def process_offset(offset_params, arm_name):
 
     roll, pitch, yaw = [*offset_params[0]]
     print("RPY:", roll, pitch, yaw)
-    ik = MySymIK(shoulder_offset=[roll, pitch, yaw])
-    urdf_str, _ = rp.offset_urdf(roll, pitch, yaw)
-    models = rp.Models(urdf_str)
+    ik = r2.symik.SymArm(arm_name, shoulder_offset=[roll, pitch, yaw])
+    urdf_str, _ = r2.pin.offset_urdf(roll, pitch, yaw)
+    models = r2.pin.Models(urdf_str)
 
-    def load_or_copy(arm, csvdf, force_processing):
+    def load_or_copy(csvdf, force_processing):
         needs_processing = False
         df = None
         if not force_processing:
-            df = load_pkl(args.bagdir, offset_name, arm.name)
+            df = load_pkl(args.bagdir, offset_name, arm_name)
         else:
             print("--force provided, will not try to reload pickle files")
         if df is None:
@@ -531,26 +534,22 @@ def process_offset(offset_params, arm_name):
         return df, needs_processing
 
     if arm_name == "l_arm":
-        larm = ru.ArmHandler("l_arm", models.l_arm)
-        ldf, lneeds_processing = load_or_copy(larm, csv_ldf, args.force)
+        larm = ru.RRArm("l_arm", models.l_arm)
+        ldf, lneeds_processing = load_or_copy(csv_ldf, args.force)
         needs_processing, arm, df = lneeds_processing, larm, ldf
-        save_result(
-            arm.name,
-            offset_name,
-            process_arm(needs_processing, arm, df, ik, offset_name),
-        )
     elif arm_name == "r_arm":
-        rarm = ru.ArmHandler("r_arm", models.r_arm)
-        rdf, rneeds_processing = load_or_copy(rarm, csv_rdf, args.force)
+        rarm = ru.RRArm("r_arm", models.r_arm)
+        rdf, rneeds_processing = load_or_copy(csv_rdf, args.force)
         needs_processing, arm, df = rneeds_processing, rarm, rdf
-        save_result(
-            arm.name,
-            offset_name,
-            process_arm(needs_processing, arm, df, ik, offset_name),
-        )
     else:
         print(f"Error: unknown arm_name {arm_name}")
         exit(1)
+
+    save_result(
+        arm_name,
+        offset_name,
+        process_arm(needs_processing, arm, df, ik, offset_name),
+    )
 
 
 parameters = [

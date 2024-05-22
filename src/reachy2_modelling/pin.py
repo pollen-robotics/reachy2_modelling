@@ -7,6 +7,8 @@ from pathlib import Path
 import numpy as np
 import pinocchio as pin
 
+import reachy2_modelling as r2
+
 original_urdf_path = str(
     Path(__file__).parent / "reachy2_rerun_test" / "reachy_v2_fix.urdf"
 )
@@ -173,3 +175,79 @@ class Models:
 
 
 models = Models(urdf_str)
+
+
+class PinArm:
+    ljoints = [
+        "l_shoulder_pitch",
+        "l_shoulder_roll",
+        "l_elbow_yaw",
+        "l_elbow_pitch",
+        "l_wrist_roll",
+        "l_wrist_pitch",
+        "l_wrist_yaw",
+    ]
+
+    rjoints = [
+        "r_shoulder_pitch",
+        "r_shoulder_roll",
+        "r_elbow_yaw",
+        "r_elbow_pitch",
+        "r_wrist_roll",
+        "r_wrist_pitch",
+        "r_wrist_yaw",
+    ]
+
+    ltip = "l_arm_tip"
+    rtip = "r_arm_tip"
+
+    def __init__(self, name, model=None):
+        self.arm = r2.Arm(name)
+        self.prev_q = None
+        self.prev_epoch_s = None
+
+        self.model = model
+        if model is None:
+            if self.arm.name == "l_arm":
+                self.model = models.l_arm
+            else:
+                self.model = models.r_arm
+
+        self.joints = self.rjoints
+        self.tip = self.rtip
+        if self.arm.name == "l_arm":
+            self.joints = self.ljoints
+            self.tip = self.ltip
+
+    def modeldata(self):
+        return self.model, self.model.createData()
+
+    def njoint_name(self, n):
+        return self.joints[n]
+
+    def fk(self, q, tip=None, world=False):
+        if tip is None:
+            tip = self.tip
+        model, data = self.modeldata()
+        return fk(model, data, q, tip, world)
+
+    def jacobian(self, q, tip=None):
+        if tip is None:
+            tip = self.tip
+        model, data = self.modeldata()
+        return jacobian_frame(model, data, q, tip)
+
+    def manip(self, q, tip, njoints=None):
+        if njoints is None:
+            njoints = 7
+        J = self.jacobian(q, tip)[:, :njoints]
+        return manip(J)
+
+    def linmanip(self, q, tip, njoints=None):
+        if njoints is None:
+            njoints = 7
+        J = self.jacobian(q, tip)[:3, :njoints]
+        return manip(J)
+
+    def ik(self, ik, M):
+        return ik.symbolic_inverse_kinematics(self.arm.name, M)

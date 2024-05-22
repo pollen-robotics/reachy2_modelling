@@ -10,6 +10,8 @@ pycapacity >=2.1
 scipy<=1.11 # remove after roboticstoolbox-python fixes #412
 plotly
 pandas
+pink
+qpsolvers
 # rerun stuff
 rerun-sdk==0.15.1
 trimesh >= 4

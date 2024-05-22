@@ -12,6 +12,8 @@ from reachy2_symbolic_ik.utils import (
 )
 from scipy.spatial.transform import Rotation
 
+import reachy2_modelling as r2
+
 
 def inverse_kinematics(
     ik_solver, q0: np.ndarray, target_pose: np.ndarray, nb_joints: int
@@ -46,7 +48,10 @@ def get_euler_from_homogeneous_matrix(homogeneous_matrix, degrees: bool = False)
     return position, euler_angles
 
 
-class MySymIK:
+class ArmSymIKControl:
+    """
+    Wrapper for sym ik instantiation inside ros2_toolbox (including control)
+    """
 
     def __init__(self, shoulder_offset=None):
         if shoulder_offset is None:
@@ -242,3 +247,12 @@ class MySymIK:
         joints[4:7] = wrist_joints
 
         return joints
+
+
+class SymArm:
+    def __init__(self, name, shoulder_offset=None):
+        self.arm = r2.Arm(name)
+        self.symikcontrol = ArmSymIKControl(shoulder_offset=shoulder_offset)
+
+    def ik(self, M):
+        return self.symikcontrol.symbolic_inverse_kinematics(self.arm.name, M)

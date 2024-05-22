@@ -13,15 +13,7 @@ from scipy.spatial.transform import Rotation
 
 pd.options.plotting.backend = "plotly"
 
-# from reachy2_modelling.old.symik import (
-#     MySymIK,
-#     data_larm,
-#     data_rarm,
-#     model_larm,
-#     model_rarm,
-#     fk, jacobian_joint, jacobian_frame, manip, svals,
-# )
-from reachy2_modelling.old.symik import *
+import reachy2_modelling as r2
 
 np.set_printoptions(formatter={"float": lambda x: "{0:0.2f}".format(x)})
 
@@ -110,7 +102,6 @@ if os.path.isfile(pkl_fname):
 else:
     print("pkl file NOT ({}) found, processing".format(pkl_fname))
 
-ik = MySymIK()
 if "l_arm" not in csvfilebase and "r_arm" not in csvfilebase:
     print(
         'Error: {} does not contain "l_arm" or "l_arm" in name to determine which model'.format(
@@ -126,12 +117,11 @@ tip = "l_elbow_pitch"  # joint
 # tip = None
 
 arm_str = "l_arm"
-arm_model = model_larm
-arm_data = data_larm
-if "r_arm" in csvfilebase:
-    arm_str = "r_arm"
-    arm_model = model_rarm
-    arm_data = data_rarm
+
+symik = r2.symik.SymArm(arm_str)
+pinarm = r2.pin.PinArm(arm_str)
+arm_model = pinarm.model
+arm_data = arm_model.createData()
 
 
 def correct_arm(ttip):
