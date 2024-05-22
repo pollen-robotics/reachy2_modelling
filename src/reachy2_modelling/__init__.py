@@ -19,10 +19,10 @@ class Arm:
         assert self.name == "l_arm" or self.name == "r_arm"
 
 
+import reachy2_modelling.ik
+
 # example
 # old = LazyVar(lambda :importlib.import_module("reachy2_modelling.old"))
 import reachy2_modelling.old
 import reachy2_modelling.pin
 import reachy2_modelling.symik
-
-# import reachy2_modelling.ik
