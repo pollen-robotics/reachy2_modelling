@@ -5,9 +5,9 @@ example-robot-data
 meshcat
 ipywidgets
 ipympl
-roboticstoolbox-python
+roboticstoolbox-python>=1.1
 pycapacity >=2.1
-scipy<=1.11 # remove after roboticstoolbox-python fixes #412
+scipy
 plotly
 pandas
 pin-pink
