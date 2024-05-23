@@ -1,19 +1,45 @@
 #!/usr/bin/env python3
 import argparse
 import code
+import multiprocessing as mp
 import os
 import time
+from dataclasses import dataclass
 
+import matplotlib
 import numpy as np
 import pandas as pd
+import reachy2_modelling as r2
+import reachy2_modelling.rerun_utils as ru
 from matplotlib import pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from scipy.spatial.transform import Rotation
 
-import reachy2_modelling as r2
-import reachy2_modelling.rerun_utils as ru
+print("matplotlibrc:", matplotlib.matplotlib_fname())
+plt.style.use("classic")
+
+
+SMALL_SIZE = 13
+MEDIUM_SIZE = 15
+BIGGER_SIZE = 17
+
+plt.rc("font", size=SMALL_SIZE)  # controls default text sizes
+plt.rc("axes", titlesize=MEDIUM_SIZE)  # fontsize of the axes title
+plt.rc("axes", titleweight="roman")  # fontsize of the axes title
+plt.rc("axes", labelsize=MEDIUM_SIZE)  # fontsize of the x and y labels
+plt.rc("xtick", labelsize=SMALL_SIZE)  # fontsize of the tick labels
+plt.rc("ytick", labelsize=SMALL_SIZE)  # fontsize of the tick labels
+plt.rc("legend", fontsize=MEDIUM_SIZE)  # legend fontsize
+plt.rc("figure", titlesize=BIGGER_SIZE)  # fontsize of the figure title
+# 'normal', 'regular', 'book', 'medium', 'roman', 'semibold', 'demibold', 'demi', 'bold'
+plt.rc("figure", titleweight="bold")
+
+# # plt.rc('legend',fontsize=10) # using a size in points
+# plt.rcParams.update({'font.size': 10})
+# plt.rc('legend',fontsize='medium') # using a named size
 
 plt.rcParams["figure.constrained_layout.use"] = True
+
 np.set_printoptions(formatter={"float": lambda x: "{0:0.2f}".format(x)})
 pd.set_option("display.precision", 2)
 
@@ -22,24 +48,45 @@ qdcols = [f"qd{x+1}" for x in np.arange(7)]
 
 results = None
 
+# the order to show the labels in graphs
+ordered_labels = [
+    "beta",
+    "straight",
+    "backwards",
+    "upwards-5",
+    "upwards-10",
+    "upwards-20",
+    "backo-upwards",
+]
+
+
+@dataclass
+class Result:
+    name: str
+    offset: str
+    df: pd.DataFrame
+
 
 def arm_graphs(df, arm_name, no_joints, images, bagdir):
-    bins = 10
+    bins = 8
     alpha = 0.6
-    # bbox_to_anchor = (0.5, 1.03)
     bbox_to_anchor = None
-    # legend_loc = "lower center"
     legend_loc = "upper right"
+
+    legend_loc = "center"
+    bbox_to_anchor = (0.7, 0.99)
+    # legend_loc = "lower center"
     legend_ncols = 10
     rwidth = 7
     figsize = (20, 11)
     dpi = 300
+    title_xloc = 0.2
 
     subplot_cols = 5 - no_joints * 2
 
     fig1, axes1 = plt.subplots(4, subplot_cols)
     axes1 = np.array(axes1)
-    fig1.suptitle(f"{bagdir}: {arm_name} joints 1,2,3,4")
+    fig1.suptitle(f"{bagdir}: {arm_name} joints 1,2,3,4", x=title_xloc)
 
     # q1 qd1 hist_qd1 manip2 linmanip2
     # q2 qd2 hist_qd2 manip3 linmanip3
@@ -50,14 +97,7 @@ def arm_graphs(df, arm_name, no_joints, images, bagdir):
         datas = df.groupby("offset")[col]
         labels = [x[0] for x in datas]
         dataseries = [x[1] for x in datas]
-        ordered_labels = [
-            "beta",
-            "straight",
-            "backwards",
-            "upwards20",
-            "upwards-20",
-            "backo-upwards",
-        ]
+        global ordered_labels
         ordered_dataseries = []
         for label in ordered_labels:
             idx = labels.index(label)
@@ -142,10 +182,11 @@ def arm_graphs(df, arm_name, no_joints, images, bagdir):
     plot(axes1[3, 4 - no_joints * 2], *data_to_plot(var), var)
 
     fig1.legend(
-        *axes1[0, 0].get_legend_handles_labels(),
+        *axes1[0, 3].get_legend_handles_labels(),
         loc=legend_loc,
         ncol=legend_ncols,
         bbox_to_anchor=bbox_to_anchor,
+        # prop={'width':5},
     )
     # fig1.tight_layout()
     if images:
@@ -155,7 +196,7 @@ def arm_graphs(df, arm_name, no_joints, images, bagdir):
         fig1.savefig(img_file, bbox_inches="tight", dpi=dpi)
 
     fig2, axes2 = plt.subplots(4, subplot_cols)
-    fig2.suptitle(f"{bagdir}: {arm_name} wrist joints (5,6,7)")
+    fig2.suptitle(f"{bagdir}: {arm_name} wrist joints (5,6,7)", x=title_xloc)
     for row in range(3):
         xlabel = "s"
         if not no_joints:
@@ -180,7 +221,7 @@ def arm_graphs(df, arm_name, no_joints, images, bagdir):
     plot(axes2[3, 4 - no_joints * 2], *data_to_plot(var), var)
 
     fig2.legend(
-        *axes1[0, 0].get_legend_handles_labels(),
+        *axes1[0, 3].get_legend_handles_labels(),
         loc=legend_loc,
         ncol=legend_ncols,
         bbox_to_anchor=bbox_to_anchor,
@@ -300,7 +341,11 @@ def histogram_qd(results):
     # fig1.tight_layout()
 
 
-def save_result(arm_name, offset_name, df):
+# def save_result(arm_name, offset_name, df):
+def save_result(res):
+    arm_name = res.name
+    offset_name = res.offset
+    df = res.df
     if "arm" not in df:
         df["arm"] = arm_name
     if "offset" not in df:
@@ -315,17 +360,6 @@ def save_result(arm_name, offset_name, df):
     # if arm_name not in results:
     #     results[arm_name] = {}
     # results[arm_name][offset_name] = df
-
-
-def separate_big():
-    print(70 * "_")
-    print(70 * "_")
-    print(70 * "_")
-
-
-def separate():
-    print(40 * "-")
-    print(40 * "-")
 
 
 def pklpath(bagdir, offset, arm_name):
@@ -417,6 +451,11 @@ parser.add_argument(
 )
 parser.add_argument("--images", action="store_true", help="generate image files")
 parser.add_argument(
+    "-j",
+    help="number of threads to use",
+    default=mp.cpu_count(),
+)
+parser.add_argument(
     "--no-joints",
     dest="no_joints",
     action="store_true",
@@ -429,6 +468,8 @@ parser.add_argument(
     help="enter interactive python session after loading files",
 )
 args = parser.parse_args()
+
+print(f"gonna use {args.j} threads (change with -jN)")
 
 larmf = os.path.join(args.bagdir, "l_arm_target_pose.csv")
 rarmf = os.path.join(args.bagdir, "r_arm_target_pose.csv")
@@ -449,32 +490,53 @@ offsets = [
     ([10, 0, 15], "beta"),  # current: config 0
     ([0, 0, 0], "straight"),
     ([0, 0, -5], "backwards"),
-    ([20, 0, 0], "upwards20"),
+    ([-5, 0, 0], "upwards-5"),
+    ([-10, 0, 0], "upwards-10"),
     ([-20, 0, 0], "upwards-20"),
     ([-10, 0, -5], "backo-upwards"),
 ]
 
+assert len(offsets) == len(ordered_labels), (
+    "var ordered_labels should contain all the requested offset names\n"
+    f"  offset names: {[x[1] for x in offsets]}\n"
+    f"ordered_labels: {[x for x in ordered_labels]}\n"
+)
 
-def process_arm(needs_processing, arm, df, ik, offset_name):
-    separate()
-    if not needs_processing:
-        print(f"skipping {arm.arm.name} (loaded pkl)")
-        return df
 
-    pinwrapper, symarm = arm.pinwrapper, arm.symarm
+def process_arm(arm_name, offset_name, offset_rpy):
 
-    print(f"processing {arm.arm.name}...")
+    csvdf = csv_rdf
+    if arm_name == "l_arm":
+        csvdf = csv_ldf
+    df = csvdf.copy(deep=True)
 
-    print("computing ik...")
+    symarm = r2.symik.SymArm(arm_name, shoulder_offset=offset_rpy)
+    pinwrapper = r2.pin.PinWrapperArm.from_shoulder_offset(arm_name, *offset_rpy)
+
+    total = 4
+
+    def log(msg, inc_stage=True):
+        global stage
+        base = f"{arm_name}::{offset_name}::{msg}"
+        print(f"{base:<40} |  phase:{log.stage}/{total}")
+        if inc_stage:
+            log.stage += 1
+
+    log.stage = 0
+
+    roll, pitch, yaw = [*offset_rpy]
+    log(f"RPY:{roll},{pitch},{yaw}")
+
+    log("ik")
     df = pd.concat([df, df.apply(series_to_ik_factory(symarm), axis=1)], axis=1)
 
-    print("computing qdot...")
+    log("qdot")
     df = pd.concat([df, df.apply(series_to_qd, axis=1)], axis=1)
 
-    print("computing manipulability...")
+    log("manip")
     dofs = [2, 4, 7]
     for dof in dofs:
-        print(f"- dof:{dof}")
+        log(f"manip (dof:{dof})", inc_stage=False)
         if dof != 7:
             tip = pinwrapper.njoint_name(dof)
         else:
@@ -484,7 +546,7 @@ def process_arm(needs_processing, arm, df, ik, offset_name):
                 df,
                 df.apply(
                     manip_factory(
-                        arm.pinwrapper,
+                        pinwrapper,
                         tip=tip,
                         name=f"linmanip{dof}",
                         njoints=dof,
@@ -500,7 +562,7 @@ def process_arm(needs_processing, arm, df, ik, offset_name):
                 df,
                 df.apply(
                     manip_factory(
-                        arm.pinwrapper,
+                        pinwrapper,
                         tip=tip,
                         name=f"manip{dof}",
                         njoints=dof,
@@ -512,48 +574,33 @@ def process_arm(needs_processing, arm, df, ik, offset_name):
             axis=1,
         )
 
-    pkl_fname = pklpath(args.bagdir, offset_name, arm.arm.name)
-    print(f"saving {pkl_fname}...")
+    pkl_fname = pklpath(args.bagdir, offset_name, arm_name)
+    log(f"save pkl file")
     df.to_pickle(pkl_fname)
     return df
 
 
-def process_offset(offset_params, arm_name):
+def process_offset(params):
+    offset_params, arm_name = params[0], params[1]
     offset_name = offset_params[1]
-    separate_big()
-    print(f"processing offset named {offset_name}...")
+    offset_rpy = offset_params[0]
 
-    roll, pitch, yaw = [*offset_params[0]]
-    print("RPY:", roll, pitch, yaw)
-    ik = r2.symik.SymArm(arm_name, shoulder_offset=[roll, pitch, yaw])
-    models, _, _ = r2.pin.PinModels.from_shoulder_offset(roll, pitch, yaw)
-
-    def load_or_copy(csvdf, force_processing):
-        needs_processing = False
-        df = None
-        if not force_processing:
-            df = load_pkl(args.bagdir, offset_name, arm_name)
-        else:
-            print("--force provided, will not try to reload pickle files")
-        if df is None:
-            df = csvdf.copy(deep=True)
-            needs_processing = True
-        return df, needs_processing
-
-    df, needs_processing = load_or_copy(csv_ldf, args.force)
-
-    if arm_name == "l_arm":
-        arm = ru.RRArm("l_arm", models.l_arm)
-    elif arm_name == "r_arm":
-        arm = ru.RRArm("r_arm", models.r_arm)
+    df = None
+    if args.force:
+        print(
+            f"--force used (no pickle file reload), recompute: {arm_name}:{offset_name}"
+        )
     else:
-        print(f"Error: unknown arm_name {arm_name}")
-        exit(1)
+        df = load_pkl(args.bagdir, offset_name, arm_name)
 
-    save_result(
-        arm_name,
-        offset_name,
-        process_arm(needs_processing, arm, df, ik, offset_name),
+    # not loaded
+    if df is None:
+        df = process_arm(arm_name, offset_name, offset_rpy)
+
+    return Result(
+        name=arm_name,
+        offset=offset_name,
+        df=df,
     )
 
 
@@ -567,9 +614,16 @@ parameters += [
 ]
 
 
+current_results = []
 start = time.time()
-for offset_params, arm_name in parameters:
-    process_offset(offset_params, arm_name)
+
+with mp.Pool(args.j) as p:
+    current_results = p.map(process_offset, parameters)
+print("done!")
+
+for res in current_results:
+    save_result(res)
+
 
 print(f"Total time: {time.time()-start:.2f}s")
 

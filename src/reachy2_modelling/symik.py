@@ -220,6 +220,7 @@ class ArmSymIKControl:
                 # )
                 # TEMP forbidding multiturn
                 # new_joints[index] = np.sign(new_joints[index]) * np.pi
+        multiturn = np.max(np.array(new_joints) / np.pi)
         return new_joints, multiturn
 
     def limit_orbita3d_joints(self, joints):

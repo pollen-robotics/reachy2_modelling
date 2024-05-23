@@ -182,6 +182,14 @@ class PinWrapper:
 
 
 class PinWrapperArm(PinWrapper):
+    @staticmethod
+    def from_shoulder_offset(name, roll, pitch, yaw):
+        models, _, _ = r2.pin.PinModels.from_shoulder_offset(roll, pitch, yaw)
+        model = models.r_arm
+        if name == "l_arm":
+            model = models.l_arm
+        return PinWrapperArm(name, custom_model=model)
+
     def __init__(self, name, custom_model=None):
         self.arm = r2.Arm(name)
 

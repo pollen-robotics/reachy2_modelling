@@ -5,6 +5,8 @@ from xml.etree import ElementTree as ET
 from .basics import YamlReflection, node_add, xml_children, xml_string
 
 ros2_control_warning_done = False
+inertial_parameters = ["iyx", "izx", "izy"]
+inertial_warning_done = [False for _ in inertial_parameters]
 
 # @todo Make this work with decorators
 
@@ -560,7 +562,13 @@ class Reflection(object):
 
         if is_final:
             for xml_var in info.attributes:
-                on_error('Unknown attribute "{}" in {}'.format(xml_var, path))
+                global inertial_parameters
+                global inertial_warning_done
+                if xml_var in inertial_parameters:
+                    idx = inertial_parameters.index(xml_var)
+                    if not inertial_warning_done[idx]:
+                        on_error('Unknown attribute "{}" in {}'.format(xml_var, path))
+                        inertial_warning_done[idx] = True
             for node in info.children:
                 if "ros2_control" not in node.tag:
                     on_error('Unknown tag "{}" in {}'.format(node.tag, path))
