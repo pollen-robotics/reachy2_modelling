@@ -2,6 +2,7 @@
 import argparse
 import code
 import os
+import time
 
 import numpy as np
 import pandas as pd
@@ -53,6 +54,7 @@ def arm_graphs(df, arm_name, no_joints, images, bagdir):
             "beta",
             "straight",
             "backwards",
+            "upwards20",
             "upwards-20",
             "backo-upwards",
         ]
@@ -60,9 +62,11 @@ def arm_graphs(df, arm_name, no_joints, images, bagdir):
         for label in ordered_labels:
             idx = labels.index(label)
             ordered_dataseries.append(dataseries[idx])
+
         assert len(dataseries) == len(
             ordered_dataseries
-        ), "maybe need to --force a recompute"
+        ), "check if missing ordered_labels from the desired offset list"
+        " or maybe need to --force a recompute"
         assert len(labels) == len(ordered_labels)
         return ordered_dataseries, ordered_labels
 
@@ -457,7 +461,7 @@ def process_arm(needs_processing, arm, df, ik, offset_name):
         print(f"skipping {arm.arm.name} (loaded pkl)")
         return df
 
-    pinarm, symarm = arm.pinarm, arm.symarm
+    pinwrapper, symarm = arm.pinwrapper, arm.symarm
 
     print(f"processing {arm.arm.name}...")
 
@@ -472,15 +476,15 @@ def process_arm(needs_processing, arm, df, ik, offset_name):
     for dof in dofs:
         print(f"- dof:{dof}")
         if dof != 7:
-            tip = pinarm.njoint_name(dof)
+            tip = pinwrapper.njoint_name(dof)
         else:
-            tip = pinarm.tip
+            tip = pinwrapper.tip
         df = pd.concat(
             [
                 df,
                 df.apply(
                     manip_factory(
-                        arm,
+                        arm.pinwrapper,
                         tip=tip,
                         name=f"linmanip{dof}",
                         njoints=dof,
@@ -496,7 +500,11 @@ def process_arm(needs_processing, arm, df, ik, offset_name):
                 df,
                 df.apply(
                     manip_factory(
-                        arm, tip=tip, name=f"manip{dof}", njoints=dof, linear=False
+                        arm.pinwrapper,
+                        tip=tip,
+                        name=f"manip{dof}",
+                        njoints=dof,
+                        linear=False,
                     ),
                     axis=1,
                 ),
@@ -504,7 +512,7 @@ def process_arm(needs_processing, arm, df, ik, offset_name):
             axis=1,
         )
 
-    pkl_fname = pklpath(args.bagdir, offset_name, arm.name)
+    pkl_fname = pklpath(args.bagdir, offset_name, arm.arm.name)
     print(f"saving {pkl_fname}...")
     df.to_pickle(pkl_fname)
     return df
@@ -518,8 +526,7 @@ def process_offset(offset_params, arm_name):
     roll, pitch, yaw = [*offset_params[0]]
     print("RPY:", roll, pitch, yaw)
     ik = r2.symik.SymArm(arm_name, shoulder_offset=[roll, pitch, yaw])
-    urdf_str, _ = r2.pin.offset_urdf(roll, pitch, yaw)
-    models = r2.pin.Models(urdf_str)
+    models, _, _ = r2.pin.PinModels.from_shoulder_offset(roll, pitch, yaw)
 
     def load_or_copy(csvdf, force_processing):
         needs_processing = False
@@ -533,14 +540,12 @@ def process_offset(offset_params, arm_name):
             needs_processing = True
         return df, needs_processing
 
+    df, needs_processing = load_or_copy(csv_ldf, args.force)
+
     if arm_name == "l_arm":
-        larm = ru.RRArm("l_arm", models.l_arm)
-        ldf, lneeds_processing = load_or_copy(csv_ldf, args.force)
-        needs_processing, arm, df = lneeds_processing, larm, ldf
+        arm = ru.RRArm("l_arm", models.l_arm)
     elif arm_name == "r_arm":
-        rarm = ru.RRArm("r_arm", models.r_arm)
-        rdf, rneeds_processing = load_or_copy(csv_rdf, args.force)
-        needs_processing, arm, df = rneeds_processing, rarm, rdf
+        arm = ru.RRArm("r_arm", models.r_arm)
     else:
         print(f"Error: unknown arm_name {arm_name}")
         exit(1)
@@ -562,8 +567,11 @@ parameters += [
 ]
 
 
+start = time.time()
 for offset_params, arm_name in parameters:
     process_offset(offset_params, arm_name)
+
+print(f"Total time: {time.time()-start:.2f}s")
 
 ldf = results[results.index.get_level_values("arm") == "l_arm"]
 rdf = results[results.index.get_level_values("arm") == "r_arm"]

@@ -1,11 +1,11 @@
 # general_robotics_toolbox.urdf.robot_from_xml_string
 import sys
-from pathlib import Path
 
-import numpy as np
+import pinocchio as pin
 import roboticstoolbox as rtb
 
-urdf_path = str(Path(__file__).parent / "reachy.urdf")
+import reachy2_modelling as r2
+from reachy2_modelling.urdf import path_old as urdf_path
 
 
 def print_debug(*args):
@@ -78,67 +78,36 @@ def robot_from_urdf(filepath, link_names=None, gripper_name=None):
 # panda = rtb.models.URDF.Panda()
 # print(type(panda))
 
-print_debug("full robot")
-robot = robot_from_urdf(urdf_path)
-links, name, urdf_string, urdf_filepath = rtb.Robot.URDF_read(urdf_path, tld=".")
-links_robot = [x.name for x in links]
 
-links_head = [
-    "world",
-    "torso",
-    "neck_dummy_link1",
-    "neck_dummy_link2",
-    "neck_link",
-    "neck_ball_link",
-    "head",
-    "head_base",
-    "head_tip",
-]
-links_l_arm = [
-    "world",
-    "torso",
-    "l_virtual_offset",
-    "l_shoulder_dummy_link",
-    "l_shoulder_link",
-    "l_shoulder_ball_link",
-    "l_elbow_dummy_link",
-    "l_elbow_link",
-    "l_elbow_ball_link",
-    "l_wrist_dummy_link1",
-    "l_wrist_dummy_link2",
-    "l_wrist_link",
-    "l_wrist_ball_link",
-    "l_hand_palm_link",
-    "l_arm_tip",
-    "l_hand_index_link",
-    "l_hand_index_mimic_link",
-]
-links_r_arm = [
-    "world",
-    "torso",
-    "r_virtual_offset",
-    "r_shoulder_dummy_link",
-    "r_shoulder_link",
-    "r_shoulder_ball_link",
-    "r_elbow_dummy_link",
-    "r_elbow_link",
-    "r_elbow_ball_link",
-    "r_wrist_dummy_link1",
-    "r_wrist_dummy_link2",
-    "r_wrist_link",
-    "r_wrist_ball_link",
-    "r_hand_palm_link",
-    "r_arm_tip",
-    "r_hand_index_link",
-    "r_hand_index_mimic_link",
-]
+class RTBWrapper:
+    def __init__(self, robot):
+        self.robot = robot
 
-q = np.random.rand(7)
-print_debug("robot_l_arm")
-robot_l_arm = robot_from_urdf(urdf_filepath, links_l_arm, gripper_name="l_arm_tip")
+    def fk_as_SE3(self, q, tip, world_frame=False):
+        if world_frame:
+            X = pin.SE3(self.robot.fkine(q, end=tip).A)
+        else:
+            Xworld_torso = self.robot.fkine(q, end="torso")
+            Xworld_ee = self.robot.fkine(q)
+            X = pin.SE3((Xworld_torso.inv() * Xworld_ee).A)
+            X = pin.SE3((self.robot.fkine(q, start="torso", end=tip)).A)
+        return X
 
-print_debug("robot_r_arm")
-robot_r_arm = robot_from_urdf(urdf_filepath, links_r_arm, gripper_name="r_arm_tip")
 
-print_debug("robot_head")
-robot_head = robot_from_urdf(urdf_filepath, links_head, gripper_name="head_tip")
+fullrobot = robot_from_urdf(urdf_path)
+
+l_arm = RTBWrapper(
+    robot_from_urdf(
+        urdf_path, r2.constants.l_arm_links, gripper_name=r2.constants.l_arm_tip
+    )
+)
+r_arm = RTBWrapper(
+    robot_from_urdf(
+        urdf_path, r2.constants.r_arm_links, gripper_name=r2.constants.r_arm_tip
+    )
+)
+head = RTBWrapper(
+    robot_from_urdf(
+        urdf_path, r2.constants.head_links, gripper_name=r2.constants.head_tip
+    )
+)

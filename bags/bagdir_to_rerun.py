@@ -3,9 +3,7 @@ import argparse
 
 import rerun as rr
 
-import reachy2_modelling.old.pin as oldrp
-import reachy2_modelling.pin as rp
-import reachy2_modelling.rerun_utils as ru
+import reachy2_modelling as r2
 from reachy2_modelling.rerun_loader_urdf import URDFLogger
 
 parser = argparse.ArgumentParser()
@@ -30,34 +28,38 @@ print("bagdir:", args.bagdir)
 
 ########################
 # use new or old model
-rpp = rp
 torso_entity = "world/world_joint/base_link/back_bar_joint/back_bar/torso_base/torso"
+urdf_path = r2.urdf.path
+models = r2.pin.models
 if args.old:
-    rpp = oldrp
+    urdf_path = r2.urdf.path_old
     torso_entity = "world/world_joint/torso"
+    models = r2.old.pin.models
 ########################
 
-urdf_path = rpp.urdf_path
-models = rpp.models
 shoulder_offset = None
 if args.offset is not None:
+    if args.old:
+        print("Error: --old cannot be used with --shoulder-offset")
+        exit(1)
     rpy = args.offset.split(",")
     if len(rpy) != 3:
         print(
-            "Error: --offset command must provide 3 elements like (in degrees): --offset=10,0,15"
+            "Error: --offset command must provide 3 elements like (in degrees): --shoulder-offset=10,0,15"
         )
         exit(1)
     rpy = [float(x) for x in rpy]
     shoulder_offset = rpy
     roll, pitch, yaw = [*rpy]
     print(roll, pitch, yaw)
-    urdf_str, urdf_path = rpp.offset_urdf(roll, pitch, yaw)
-    models = rpp.Models(urdf_str)
+    models, urdf_str, urdf_path = r2.pin.PinModels.from_shoulder_offset(
+        roll, pitch, yaw
+    )
+    print("shoulder offset:", shoulder_offset)
 
 model_l_arm = models.l_arm
 model_r_arm = models.r_arm
 
-print("shoulder offset:", shoulder_offset)
 print("urdf:", urdf_path)
 
 print("rr init...")
@@ -68,24 +70,18 @@ if args.save:
         args.save += recext
     args.save = f"{args.bagdir}_{args.save}"
     print(f"saving recording to {args.save}...")
-    rr.save(args.save, default_blueprint=ru.blueprint())
+    rr.save(args.save, default_blueprint=r2.rerun_utils.blueprint())
 
 rr.init("reachy_replay2", spawn=not args.web)
 if args.web:
     rr.serve()
-rr.send_blueprint(ru.blueprint())
+rr.send_blueprint(r2.rerun_utils.blueprint())
 
 print("urdflogger...")
 urdf_logger = URDFLogger(urdf_path, torso_entity)
-# urdfp_logger = URDFLogger("/home/user/pol/python-example-droid-dataset/franka_description/panda.urdf")
-# print(urdf_logger.entity_to_transform)
-# urdf_logger.log()
-# urdfp_logger.log()
-# urdf_logger.log_joint()
-# urdf = urdf_logger.urdf
-# urdfp = urdfp_logger.urdf
-# rjoints = [x for x in urdf_logger.joint_entity_paths.keys() if 'r_' in x]
 
-scene = ru.Scene(args.bagdir, model_l_arm, model_r_arm, shoulder_offset=shoulder_offset)
+scene = r2.rerun_utils.Scene(
+    args.bagdir, model_l_arm, model_r_arm, shoulder_offset=shoulder_offset
+)
 print("scene.log()...")
 scene.log(urdf_logger)

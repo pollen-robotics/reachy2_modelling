@@ -24,4 +24,16 @@ jupyter-lab pinocchio_reachy.ipynb
 
 # run some of the tests scripts
 python tests/test_reachy_fk_old.py
+
+
+# to run tests and format
+make format
+make test
+
+# to test rerun
+cd bags
+./bagdir_to_rerun.py simpletest # (contains only 6 points)
 ```
+
+
+See `TestExamples` classes inside `tests/` to see how to use the library, for instance, check `TestReachyFK_Examples` in `tests/test_reachy_fk.py`.

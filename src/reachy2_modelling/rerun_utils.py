@@ -121,7 +121,7 @@ class RRArm:
     def __init__(self, name, pinmodel, shoulder_offset=None):
         self.arm = r2.Arm(name)
         self.symarm = r2.symik.SymArm(name, shoulder_offset=shoulder_offset)
-        self.pinarm = r2.pin.PinArm(name, pinmodel)
+        self.pinwrapper = r2.pin.PinWrapperArm(name, custom_model=pinmodel)
 
         self.prev_q = None
         self.prev_epoch_s = None
@@ -131,7 +131,9 @@ class RRArm:
             q, reachable, multiturn = self.symarm.ik(M)
 
             for joint_idx, angle in enumerate(q):
-                urdf_logger.log_joint_angle(self.pinarm.njoint_name(joint_idx), angle)
+                urdf_logger.log_joint_angle(
+                    self.pinwrapper.njoint_name(joint_idx), angle
+                )
 
             if self.prev_q is not None:
                 dt = epoch_s - self.prev_epoch_s
@@ -145,18 +147,18 @@ class RRArm:
 
             # manipulability
             for dof in [2, 4, 7]:
-                tip = self.pinarm.joints[dof - 1]
+                tip = self.pinwrapper.joints[dof - 1]
                 rr.log(
                     arm_entity(self.arm.name, f"manip/{dof}dof"),
-                    rr.Scalar(self.pinarm.manip(q, tip, njoints=dof)),
+                    rr.Scalar(self.pinwrapper.manip(q, tip, njoints=dof)),
                 )
                 rr.log(
                     arm_entity(self.arm.name, f"linmanip/{dof}dof"),
-                    rr.Scalar(self.pinarm.linmanip(q, tip, njoints=dof)),
+                    rr.Scalar(self.pinwrapper.linmanip(q, tip, njoints=dof)),
                 )
 
             # fk to compute error
-            Mcur = self.pinarm.fk(q)
+            Mcur = self.pinwrapper.fk(q)
             trans, R = Mcur.translation, Mcur.rotation
             for i, coord in enumerate(["x", "y", "z"]):
                 entity = teleop_arm_entity(self.arm.name, f"state_{coord}")

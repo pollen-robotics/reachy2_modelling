@@ -1,13 +1,8 @@
-#!/usr/bin/env python
+from ..pin import PinModels, PinWrapperArm, PinWrapperHead
+from ..urdf import content_old as urdf_content
 
-from pathlib import Path
+models = PinModels(urdf_content)
 
-import pinocchio as pin
-
-from ..pin import Models
-
-urdf_path = str(Path(__file__).parent / "reachy.urdf")
-robot = pin.RobotWrapper.BuildFromURDF(urdf_path)
-urdf_str = open(urdf_path).read()
-
-models = Models(urdf_str)
+l_arm = PinWrapperArm("l_arm", custom_model=models.l_arm)
+r_arm = PinWrapperArm("r_arm", custom_model=models.r_arm)
+head = PinWrapperHead(custom_model=models.head)
