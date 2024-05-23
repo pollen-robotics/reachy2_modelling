@@ -9,12 +9,11 @@ from dataclasses import dataclass
 import matplotlib
 import numpy as np
 import pandas as pd
+import reachy2_modelling as r2
+import reachy2_modelling.rerun_utils as ru
 from matplotlib import pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from scipy.spatial.transform import Rotation
-
-import reachy2_modelling as r2
-import reachy2_modelling.rerun_utils as ru
 
 print("matplotlibrc:", matplotlib.matplotlib_fname())
 plt.style.use("classic")
@@ -47,7 +46,11 @@ pd.set_option("display.precision", 2)
 qcols = [f"q{x+1}" for x in np.arange(7)]
 qdcols = [f"qd{x+1}" for x in np.arange(7)]
 
+# where final results will be stored
 results = None
+
+# used for computing the manipulability
+manip_dofs = [2, 4, 7]
 
 # the order to show the labels in graphs
 ordered_labels = [
@@ -128,7 +131,7 @@ def arm_graphs(df, arm_name, no_joints, images, bagdir):
             ax.set_ylabel(ylabel)
         ax.grid()
 
-    def hist_qd(ax, dataseries, labels, title, quantmin=0.1, quantmax=0.9):
+    def hist_qd(ax, dataseries, labels, title, quantmin=0.15, quantmax=0.85):
         hist(
             ax,
             dataseries,
@@ -170,7 +173,7 @@ def arm_graphs(df, arm_name, no_joints, images, bagdir):
         var = f"qd{row+1}"
         hist_qd(axes1[row, 2 - no_joints * 2], *data_to_plot(var), var)
 
-    for row, dof in enumerate([2, 4, 7]):
+    for row, dof in enumerate(manip_dofs):
         var = f"linmanip{dof}"
         hist(axes1[row, 3 - no_joints * 2], *data_to_plot(var), var)
 
@@ -209,7 +212,7 @@ def arm_graphs(df, arm_name, no_joints, images, bagdir):
         var = f"qd{row+1}"
         hist_qd(axes2[row, 2 - no_joints * 2], *data_to_plot(var), var)
 
-    for row, dof in enumerate([2, 4, 7]):
+    for row, dof in enumerate(manip_dofs):
         var = f"linmanip{dof}"
         hist(axes2[row, 3 - no_joints * 2], *data_to_plot(var), var)
 
@@ -503,17 +506,33 @@ assert len(offsets) == len(ordered_labels), (
 )
 
 
-def process_arm(arm_name, offset_name, offset_rpy):
+def process_offset(params):
+    offset_params, arm_name = params[0], params[1]
+    offset_name = offset_params[1]
+    offset_rpy = offset_params[0]
 
+    df = None
+    if args.force:
+        print(
+            f"--force used (no pickle file reload), recompute: {arm_name}:{offset_name}"
+        )
+    else:
+        df = load_pkl(args.bagdir, offset_name, arm_name)
+
+    # if df loaded, finish, else process
+    if df is not None:
+        return Result(name=arm_name, offset=offset_name, df=df)
     csvdf = csv_rdf
     if arm_name == "l_arm":
         csvdf = csv_ldf
+
+    # don't overwrite original df
     df = csvdf.copy(deep=True)
 
     symarm = r2.symik.SymArm(arm_name, shoulder_offset=offset_rpy)
     pinwrapper = r2.pin.PinWrapperArm.from_shoulder_offset(arm_name, *offset_rpy)
 
-    total = 4
+    total = 4 + len(manip_dofs)
 
     def log(msg, inc_stage=True):
         global stage
@@ -534,9 +553,8 @@ def process_arm(arm_name, offset_name, offset_rpy):
     df = pd.concat([df, df.apply(series_to_qd, axis=1)], axis=1)
 
     log("manip")
-    dofs = [2, 4, 7]
-    for dof in dofs:
-        log(f"manip (dof:{dof})", inc_stage=False)
+    for dof in manip_dofs:
+        log(f"manip (dof:{dof})")
         if dof != 7:
             tip = pinwrapper.njoint_name(dof)
         else:
@@ -577,31 +595,8 @@ def process_arm(arm_name, offset_name, offset_rpy):
     pkl_fname = pklpath(args.bagdir, offset_name, arm_name)
     log(f"save pkl file")
     df.to_pickle(pkl_fname)
-    return df
 
-
-def process_offset(params):
-    offset_params, arm_name = params[0], params[1]
-    offset_name = offset_params[1]
-    offset_rpy = offset_params[0]
-
-    df = None
-    if args.force:
-        print(
-            f"--force used (no pickle file reload), recompute: {arm_name}:{offset_name}"
-        )
-    else:
-        df = load_pkl(args.bagdir, offset_name, arm_name)
-
-    # not loaded
-    if df is None:
-        df = process_arm(arm_name, offset_name, offset_rpy)
-
-    return Result(
-        name=arm_name,
-        offset=offset_name,
-        df=df,
-    )
+    return Result(name=arm_name, offset=offset_name, df=df)
 
 
 parameters = [
