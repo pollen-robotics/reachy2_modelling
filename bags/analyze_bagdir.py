@@ -9,11 +9,12 @@ from dataclasses import dataclass
 import matplotlib
 import numpy as np
 import pandas as pd
-import reachy2_modelling as r2
-import reachy2_modelling.rerun_utils as ru
 from matplotlib import pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from scipy.spatial.transform import Rotation
+
+import reachy2_modelling as r2
+import reachy2_modelling.rerun_utils as ru
 
 print("matplotlibrc:", matplotlib.matplotlib_fname())
 plt.style.use("classic")
@@ -341,7 +342,6 @@ def histogram_qd(results):
     # fig1.tight_layout()
 
 
-# def save_result(arm_name, offset_name, df):
 def save_result(res):
     arm_name = res.name
     offset_name = res.offset
