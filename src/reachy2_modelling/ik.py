@@ -1,9 +1,13 @@
 import numpy as np
 import pink
+import pinocchio as pin
 import qpsolvers
 from pink import solve_ik
 from pink.tasks import FrameTask, PostureTask
-from pink.utils import custom_configuration_vector
+
+import reachy2_modelling as r2
+
+# from pink.utils import custom_configuration_vector
 
 
 class PinkIk:
@@ -48,6 +52,8 @@ class PinkIk:
             self.solver = "quadprog"
 
     def solve(self, target_pose, dt, q0=None, q_ref=None):
+        if not isinstance(target_pose, pin.SE3):
+            target_pose = pin.SE3(target_pose)
 
         if q0 is None:
             q0 = self.configuration.q
@@ -68,3 +74,39 @@ class PinkIk:
         self.configuration.integrate_inplace(velocity, dt)
 
         return self.configuration.q
+
+
+class PinkIKArmWrapper:
+    @staticmethod
+    def from_shoulder_offset(name, roll, pitch, yaw):
+        return PinkIKArmWrapper(
+            name,
+            pinwrapper=r2.pin.PinWrapperArm.from_shoulder_offset(
+                name, roll, pitch, yaw
+            ),
+        )
+
+    def __init__(self, name, pinwrapper=None):
+        self.type_name = "pink"
+        self.arm = r2.Arm(name)
+        if pinwrapper is None:
+            pinwrapper = r2.pin.PinWrapperArm(name)
+        self.pinwrapper = pinwrapper
+        self.pinkik = PinkIk(self.pinwrapper.model)
+
+    def ik(self, M, dt=0.01, q0=None, q_ref=None, tol=1e-3):
+        if not isinstance(M, pin.SE3):
+            M = pin.SE3(M)
+        q = self.pinkik.solve(M, dt, q0, q_ref)
+
+        reachable = True
+        if (
+            np.linalg.norm(
+                pin.log(M.actInv(self.pinwrapper.fk(q, torso_frame=True))).vector
+            )
+            > tol
+        ):
+            reachable = True
+
+        multiturn = False  # unused
+        return q, reachable, multiturn

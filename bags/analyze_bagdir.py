@@ -9,11 +9,12 @@ from dataclasses import dataclass
 import matplotlib
 import numpy as np
 import pandas as pd
-import reachy2_modelling as r2
-import reachy2_modelling.rerun_utils as ru
 from matplotlib import pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from scipy.spatial.transform import Rotation
+
+import reachy2_modelling as r2
+import reachy2_modelling.rerun_utils as ru
 
 print("matplotlibrc:", matplotlib.matplotlib_fname())
 plt.style.use("classic")
@@ -396,10 +397,10 @@ def manip_factory(arm, tip, name, njoints, linear):
     return series_to_manip
 
 
-def series_to_ik_factory(symarm):
+def series_to_ik_factory(ikarm):
     def series_to_ik(series):
         M = series_to_mat(series)
-        q, reachable, multiturn = symarm.ik(M)
+        q, reachable, multiturn = ikarm.ik(M)
 
         data = {}
         for i, ang in enumerate(q):
@@ -463,6 +464,12 @@ parser.add_argument(
     dest="no_joints",
     action="store_true",
     help="don't show joint q and qd in graphs",
+)
+parser.add_argument(
+    "--pink-ik",
+    dest="pink_ik",
+    action="store_true",
+    help="use pink IK instead of symbolic",
 )
 parser.add_argument(
     "-i",
@@ -529,7 +536,11 @@ def process_offset(params):
     # don't overwrite original df
     df = csvdf.copy(deep=True)
 
-    symarm = r2.symik.SymArm(arm_name, shoulder_offset=offset_rpy)
+    # use symik or pinkik
+    ikarm = r2.symik.SymArm(arm_name, shoulder_offset=offset_rpy)
+    if args.pink_ik:
+        ikarm = r2.ik.PinkIKArmWrapper.from_shoulder_offset(arm_name, *offset_rpy)
+
     pinwrapper = r2.pin.PinWrapperArm.from_shoulder_offset(arm_name, *offset_rpy)
 
     total = 4 + len(manip_dofs)
@@ -547,7 +558,7 @@ def process_offset(params):
     log(f"RPY:{roll},{pitch},{yaw}")
 
     log("ik")
-    df = pd.concat([df, df.apply(series_to_ik_factory(symarm), axis=1)], axis=1)
+    df = pd.concat([df, df.apply(series_to_ik_factory(ikarm), axis=1)], axis=1)
 
     log("qdot")
     df = pd.concat([df, df.apply(series_to_qd, axis=1)], axis=1)

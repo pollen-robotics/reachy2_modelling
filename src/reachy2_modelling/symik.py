@@ -4,9 +4,12 @@ import time
 import numpy as np
 import PyKDL as kdl
 from reachy2_symbolic_ik.symbolic_ik import SymbolicIK
-from reachy2_symbolic_ik.utils import (angle_diff, get_best_continuous_theta,
-                                       limit_theta_to_interval,
-                                       tend_to_prefered_theta)
+from reachy2_symbolic_ik.utils import (
+    angle_diff,
+    get_best_continuous_theta,
+    limit_theta_to_interval,
+    tend_to_prefered_theta,
+)
 from scipy.spatial.transform import Rotation
 
 import reachy2_modelling as r2
@@ -51,6 +54,7 @@ class ArmSymIKControl:
     """
 
     def __init__(self, shoulder_offset=None):
+        self.type_name = "sym"
         if shoulder_offset is None:
             shoulder_offset = [10, 0, 15]
 
@@ -218,7 +222,7 @@ class ArmSymIKControl:
                 # TEMP forbidding multiturn
                 # new_joints[index] = np.sign(new_joints[index]) * np.pi
         if multiturn:
-            multiturn = np.sum(np.maximum(np.abs(new_joints) - np.pi, 0)/np.pi)
+            multiturn = np.sum(np.maximum(np.abs(new_joints) - np.pi, 0) / np.pi)
         else:
             multiturn = 0
         return new_joints, multiturn
