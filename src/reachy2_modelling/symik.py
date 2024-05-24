@@ -4,12 +4,9 @@ import time
 import numpy as np
 import PyKDL as kdl
 from reachy2_symbolic_ik.symbolic_ik import SymbolicIK
-from reachy2_symbolic_ik.utils import (
-    angle_diff,
-    get_best_continuous_theta,
-    limit_theta_to_interval,
-    tend_to_prefered_theta,
-)
+from reachy2_symbolic_ik.utils import (angle_diff, get_best_continuous_theta,
+                                       limit_theta_to_interval,
+                                       tend_to_prefered_theta)
 from scipy.spatial.transform import Rotation
 
 import reachy2_modelling as r2
@@ -220,7 +217,10 @@ class ArmSymIKControl:
                 # )
                 # TEMP forbidding multiturn
                 # new_joints[index] = np.sign(new_joints[index]) * np.pi
-        multiturn = np.max(np.array(new_joints) / np.pi)
+        if multiturn:
+            multiturn = np.sum(np.maximum(np.abs(new_joints) - np.pi, 0)/np.pi)
+        else:
+            multiturn = 0
         return new_joints, multiturn
 
     def limit_orbita3d_joints(self, joints):

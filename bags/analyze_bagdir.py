@@ -537,7 +537,7 @@ def process_offset(params):
     def log(msg, inc_stage=True):
         global stage
         base = f"{arm_name}::{offset_name}::{msg}"
-        print(f"{base:<40} |  phase:{log.stage}/{total}")
+        print(f"{base:<40} |  {args.bagdir}::phase:{log.stage}/{total}")
         if inc_stage:
             log.stage += 1
 
