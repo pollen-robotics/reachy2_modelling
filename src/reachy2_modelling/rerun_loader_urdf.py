@@ -171,40 +171,37 @@ class URDFLogger:
             log_trimesh(self.root_path + entity_path, mesh)
 
 
+
 def log_trimesh(entity_path: str, mesh: trimesh.Trimesh) -> None:
     vertex_colors = albedo_texture = vertex_texcoords = None
+
     if isinstance(mesh.visual, trimesh.visual.color.ColorVisuals):
         vertex_colors = mesh.visual.vertex_colors
     elif isinstance(mesh.visual, trimesh.visual.texture.TextureVisuals):
-        albedo_texture = mesh.visual.material.baseColorTexture
-        if len(np.asarray(albedo_texture).shape) == 2:
-            # If the texture is grayscale, we need to convert it to RGB.
-            albedo_texture = np.stack([albedo_texture] * 3, axis=-1)
-        vertex_texcoords = mesh.visual.uv
-        # Trimesh uses the OpenGL convention for UV coordinates, so we need to flip the V coordinate
-        # since Rerun uses the Vulkan/Metal/DX12/WebGPU convention.
-        if vertex_texcoords is None:
-            pass
-        else:
+        trimesh_material = mesh.visual.material
+
+        if mesh.visual.uv is not None:
+            vertex_texcoords = mesh.visual.uv
+            # Trimesh uses the OpenGL convention for UV coordinates, so we need to flip the V coordinate
+            # since Rerun uses the Vulkan/Metal/DX12/WebGPU convention.
             vertex_texcoords[:, 1] = 1.0 - vertex_texcoords[:, 1]
-    else:
-        # Neither simple color nor texture, so we'll try to retrieve vertex colors via trimesh.
-        try:
-            colors = mesh.visual.to_color().vertex_colors
-            if len(colors) == 4:
-                # If trimesh gives us a single vertex color for the entire mesh, we can interpret that
-                # as an albedo factor for the whole primitive.
-                mesh_material = Material(albedo_factor=np.array(colors))
+
+        if isinstance(trimesh_material, trimesh.visual.material.PBRMaterial):
+            if trimesh_material.baseColorTexture is not None:
+                albedo_texture = pil_image_to_albedo_texture(trimesh_material.baseColorTexture)
+            elif trimesh_material.baseColorFactor is not None:
+                vertex_colors = trimesh_material.baseColorFactor
+        elif isinstance(trimesh_material, trimesh.visual.material.SimpleMaterial):
+            if trimesh_material.image is not None:
+                albedo_texture = pil_image_to_albedo_texture(trimesh_material.image)
             else:
-                vertex_colors = colors
-        except Exception:
-            pass
+                vertex_colors = mesh.visual.to_color().vertex_colors
 
     rr.log(
         entity_path,
         rr.Mesh3D(
             vertex_positions=mesh.vertices,
-            indices=mesh.faces,
+            triangle_indices=mesh.faces,
             vertex_normals=mesh.vertex_normals,
             vertex_colors=vertex_colors,
             albedo_texture=albedo_texture,
@@ -214,16 +211,14 @@ def log_trimesh(entity_path: str, mesh: trimesh.Trimesh) -> None:
     )
 
 
-def resolve_ros_path(path: str) -> str:
+def resolve_ros_path(path_str: str) -> str:
     """Resolve a ROS path to an absolute path."""
-    if path.startswith("package://"):
-        path = pathlib.Path(path)
+    if path_str.startswith("package://"):
+        path = pathlib.Path(path_str)
         package_name = path.parts[1]
         relative_path = pathlib.Path(*path.parts[2:])
 
-        package_path = resolve_ros1_package(package_name) or resolve_ros2_package(
-            package_name
-        )
+        package_path = resolve_ros1_package(package_name) or resolve_ros2_package(package_name)
 
         if package_path is None:
             raise ValueError(
@@ -232,10 +227,10 @@ def resolve_ros_path(path: str) -> str:
             )
 
         return str(package_path / relative_path)
-    elif str(path).startswith("file://"):
-        return path[len("file://") :]
+    elif path_str.startswith("file://"):
+        return path_str[len("file://") :]
     else:
-        return path
+        return path_str
 
 
 def resolve_ros2_package(package_name: str) -> Optional[str]:
@@ -250,7 +245,7 @@ def resolve_ros2_package(package_name: str) -> Optional[str]:
         return None
 
 
-def resolve_ros1_package(package_name: str) -> str:
+def resolve_ros1_package(package_name: str) -> Optional[str]:
     try:
         import rospkg
 
@@ -262,8 +257,18 @@ def resolve_ros1_package(package_name: str) -> str:
         return None
 
 
-def main() -> None:
+def pil_image_to_albedo_texture(image: Image.Image) -> np.ndarray:
+    """Convert a PIL image to an albedo texture."""
+    albedo_texture = np.asarray(image)
+    if albedo_texture.ndim == 2:
+        # If the texture is grayscale, we need to convert it to RGB since
+        # Rerun expects a 3-channel texture.
+        # See: https://github.com/rerun-io/rerun/issues/4878
+        albedo_texture = np.stack([albedo_texture] * 3, axis=-1)
+    return albedo_texture
 
+
+def main() -> None:
     # The Rerun Viewer will always pass these two pieces of information:
     # 1. The path to be loaded, as a positional arg.
     # 2. A shared recording ID, via the `--recording-id` flag.
@@ -273,19 +278,37 @@ def main() -> None:
     # that file, otherwise you can just create a dedicated recording for it. Or both.
     parser = argparse.ArgumentParser(
         description="""
-This is an example executable data-loader plugin for the Rerun Viewer.
-Any executable on your `$PATH` with a name that starts with `rerun-loader-` will be
-treated as an external data-loader.
+    This is an example executable data-loader plugin for the Rerun Viewer.
+    Any executable on your `$PATH` with a name that starts with `rerun-loader-` will be
+    treated as an external data-loader.
 
-This example will load URDF files, logs them to Rerun,
-and returns a special exit code to indicate that it doesn't support anything else.
+    This example will load URDF files, logs them to Rerun,
+    and returns a special exit code to indicate that it doesn't support anything else.
 
-To try it out, copy it in your $PATH as `rerun-loader-python-example-urdf`,
-then open a URDF file with Rerun (`rerun example.urdf`).
-"""
+    To try it out, copy it in your $PATH as `rerun-loader-python-example-urdf`,
+    then open a URDF file with Rerun (`rerun example.urdf`).
+        """
     )
     parser.add_argument("filepath", type=str)
-    parser.add_argument("--recording-id", type=str)
+
+    parser.add_argument("--application-id", type=str, help="optional recommended ID for the application")
+    parser.add_argument("--recording-id", type=str, help="optional recommended ID for the recording")
+    parser.add_argument("--entity-path-prefix", type=str, help="optional prefix for all entity paths")
+    parser.add_argument(
+        "--timeless", action="store_true", default=False, help="optionally mark data to be logged as timeless"
+    )
+    parser.add_argument(
+        "--time",
+        type=str,
+        action="append",
+        help="optional timestamps to log at (e.g. `--time sim_time=1709203426`)",
+    )
+    parser.add_argument(
+        "--sequence",
+        type=str,
+        action="append",
+        help="optional sequences to log at (e.g. `--sequence sim_frame=42`)",
+    )
     args = parser.parse_args()
 
     is_file = os.path.isfile(args.filepath)
@@ -295,12 +318,41 @@ then open a URDF file with Rerun (`rerun example.urdf`).
     if not is_file or not is_urdf_file:
         exit(rr.EXTERNAL_DATA_LOADER_INCOMPATIBLE_EXIT_CODE)
 
-    rr.init("rerun_example_external_data_loader_urdf", recording_id=args.recording_id)
+    if args.application_id is not None:
+        app_id = args.application_id
+    else:
+        app_id = args.filepath
+
+    rr.init(app_id, recording_id=args.recording_id)
     # The most important part of this: log to standard output so the Rerun Viewer can ingest it!
     rr.stdout()
 
-    urdf_logger = URDFLogger(args.filepath)
+    set_time_from_args(args)
+
+    if args.entity_path_prefix is not None:
+        prefix = args.entity_path_prefix
+    else:
+        prefix = os.path.basename(args.filepath)
+
+    urdf_logger = URDFLogger(args.filepath, prefix)
     urdf_logger.log()
+
+
+def set_time_from_args(args) -> None:
+    if not args.timeless and args.time is not None:
+        for time_str in args.time:
+            parts = time_str.split("=")
+            if len(parts) != 2:
+                continue
+            timeline_name, time = parts
+            rr.set_time_nanos(timeline_name, int(time))
+
+        for time_str in args.sequence:
+            parts = time_str.split("=")
+            if len(parts) != 2:
+                continue
+            timeline_name, time = parts
+            rr.set_time_sequence(timeline_name, int(time))
 
 
 if __name__ == "__main__":

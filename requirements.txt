@@ -13,7 +13,7 @@ pandas
 pin-pink
 qpsolvers
 # rerun stuff
-rerun-sdk==0.15.1
+rerun-sdk>=0.16
 trimesh >= 4
 pycollada
 ##################
