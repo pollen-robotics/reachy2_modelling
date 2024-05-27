@@ -1,5 +1,5 @@
 try:
-    import PyKDL as kdl
+    import PyKDL as kdl  # NOQA
 except ImportError as e:
     print("Error:", e)
     print(

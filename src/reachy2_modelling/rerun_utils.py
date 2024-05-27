@@ -11,7 +11,6 @@ from rerun.blueprint import (
     SelectionPanel,
     Spatial3DView,
     Tabs,
-    TextDocumentView,
     TimePanel,
     TimeSeriesView,
     Vertical,

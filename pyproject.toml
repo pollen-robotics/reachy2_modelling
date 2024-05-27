@@ -27,3 +27,5 @@ dependencies = {file = ["requirements.txt"]}
 where = ["src"]
 include = ["*"]  # alternatively: `exclude = ["additional*"]`
 # namespaces = false
+[tool.autoflake]
+exclude = "*kdl_parser_py*, *__init__.py*"

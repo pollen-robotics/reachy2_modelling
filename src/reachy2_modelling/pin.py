@@ -145,13 +145,27 @@ models = PinModels(r2.urdf.content)
 
 
 class PinWrapper:
-    def __init__(self, model, tip, joints):
+    def __init__(self, model, tip, joints, urdf_path=None, urdf_str=None):
         self.model = model
         self.tip = tip
         self.joints = joints
+        self.urdf_path = urdf_path
+        self.urdf_str = urdf_str
 
     def modeldata(self):
         return self.model, self.model.createData()
+
+    def model_collision(self):
+        assert self.urdf_str is not None
+        return pin.buildGeomFromUrdfString(
+            self.model, self.urdf_str, pin.COLLISION
+        )  # , package_dirs=package_dirs)
+
+    def model_visual(self):
+        assert self.urdf_str is not None
+        return pin.buildGeomFromUrdfString(
+            self.model, self.urdf_str, pin.VISUAL
+        )  # , package_dirs=package_dirs)
 
     def njoint_name(self, n):
         return self.joints[n]
@@ -184,13 +198,17 @@ class PinWrapper:
 class PinWrapperArm(PinWrapper):
     @staticmethod
     def from_shoulder_offset(name, roll, pitch, yaw):
-        models, _, _ = r2.pin.PinModels.from_shoulder_offset(roll, pitch, yaw)
+        models, urdf_str, urdf_path = r2.pin.PinModels.from_shoulder_offset(
+            roll, pitch, yaw
+        )
         model = models.r_arm
         if name == "l_arm":
             model = models.l_arm
-        return PinWrapperArm(name, custom_model=model)
+        return PinWrapperArm(
+            name, custom_model=model, urdf_str=urdf_str, urdf_path=urdf_path
+        )
 
-    def __init__(self, name, custom_model=None):
+    def __init__(self, name, custom_model=None, urdf_str=None, urdf_path=None):
         self.arm = r2.Arm(name)
 
         model = models.r_arm
@@ -203,31 +221,37 @@ class PinWrapperArm(PinWrapper):
 
         if custom_model is not None:
             model = custom_model
-        super().__init__(model=model, tip=tip, joints=joints)
+        super().__init__(
+            model=model, tip=tip, joints=joints, urdf_str=urdf_str, urdf_path=urdf_path
+        )
 
 
 class PinWrapperHead(PinWrapper):
-    def __init__(self, custom_model=None):
+    def __init__(self, custom_model=None, urdf_str=None, urdf_path=None):
         model = models.head
         joints = r2.constants.head_joints
         tip = r2.constants.head_tip
         if custom_model is not None:
             model = custom_model
-        super().__init__(model=model, tip=tip, joints=joints)
+        super().__init__(
+            model=model, tip=tip, joints=joints, urdf_str=urdf_str, urdf_path=urdf_path
+        )
 
 
 def wrappers_from_shoulder_offset(roll, pitch, yaw):
     urdf_str, urdf_path = shoulder_offset_urdf(roll, pitch, yaw)
     modmodels = PinModels(urdf_str)
     return (
-        PinWrapperArm("l_arm", modmodels.l_arm),
-        PinWrapperArm("r_arm", modmodels.l_arm),
-        PinWrapperHead(modmodels.head),
+        PinWrapperArm("l_arm", modmodels.l_arm, urdf_str=urdf_str, urdf_path=urdf_path),
+        PinWrapperArm("r_arm", modmodels.l_arm, urdf_str=urdf_str, urdf_path=urdf_path),
+        PinWrapperHead(modmodels.head, urdf_str=urdf_str, urdf_path=urdf_path),
         urdf_str,
         urdf_path,
     )
 
 
-l_arm = PinWrapperArm("l_arm")
-r_arm = PinWrapperArm("r_arm")
-head = PinWrapperHead()
+urdf_str = r2.urdf.content
+urdf_path = r2.urdf.path
+l_arm = PinWrapperArm("l_arm", urdf_str=urdf_str, urdf_path=urdf_path)
+r_arm = PinWrapperArm("r_arm", urdf_str=urdf_str, urdf_path=urdf_path)
+head = PinWrapperHead(urdf_str=urdf_str, urdf_path=urdf_path)

@@ -171,7 +171,6 @@ class URDFLogger:
             log_trimesh(self.root_path + entity_path, mesh)
 
 
-
 def log_trimesh(entity_path: str, mesh: trimesh.Trimesh) -> None:
     vertex_colors = albedo_texture = vertex_texcoords = None
 
@@ -188,7 +187,9 @@ def log_trimesh(entity_path: str, mesh: trimesh.Trimesh) -> None:
 
         if isinstance(trimesh_material, trimesh.visual.material.PBRMaterial):
             if trimesh_material.baseColorTexture is not None:
-                albedo_texture = pil_image_to_albedo_texture(trimesh_material.baseColorTexture)
+                albedo_texture = pil_image_to_albedo_texture(
+                    trimesh_material.baseColorTexture
+                )
             elif trimesh_material.baseColorFactor is not None:
                 vertex_colors = trimesh_material.baseColorFactor
         elif isinstance(trimesh_material, trimesh.visual.material.SimpleMaterial):
@@ -218,7 +219,9 @@ def resolve_ros_path(path_str: str) -> str:
         package_name = path.parts[1]
         relative_path = pathlib.Path(*path.parts[2:])
 
-        package_path = resolve_ros1_package(package_name) or resolve_ros2_package(package_name)
+        package_path = resolve_ros1_package(package_name) or resolve_ros2_package(
+            package_name
+        )
 
         if package_path is None:
             raise ValueError(
@@ -291,11 +294,20 @@ def main() -> None:
     )
     parser.add_argument("filepath", type=str)
 
-    parser.add_argument("--application-id", type=str, help="optional recommended ID for the application")
-    parser.add_argument("--recording-id", type=str, help="optional recommended ID for the recording")
-    parser.add_argument("--entity-path-prefix", type=str, help="optional prefix for all entity paths")
     parser.add_argument(
-        "--timeless", action="store_true", default=False, help="optionally mark data to be logged as timeless"
+        "--application-id", type=str, help="optional recommended ID for the application"
+    )
+    parser.add_argument(
+        "--recording-id", type=str, help="optional recommended ID for the recording"
+    )
+    parser.add_argument(
+        "--entity-path-prefix", type=str, help="optional prefix for all entity paths"
+    )
+    parser.add_argument(
+        "--timeless",
+        action="store_true",
+        default=False,
+        help="optionally mark data to be logged as timeless",
     )
     parser.add_argument(
         "--time",
