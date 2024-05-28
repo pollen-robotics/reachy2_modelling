@@ -111,6 +111,7 @@ def shoulder_offset_urdf(roll, pitch, yaw):
     tosearch = (
         '<origin rpy="-1.7453292519943295 0 -0.2617993877991494" xyz="0.0 0.2 0.0"/>'
     )
+    assert new_urdf_str.count(tosearch) == 1
     toreplace = f'<origin rpy="{-np.pi/2 -roll} 0 {-yaw}" xyz="0.0 0.2 0.0"/>'
     new_urdf_str = new_urdf_str.replace(tosearch, toreplace)
 
@@ -118,6 +119,7 @@ def shoulder_offset_urdf(roll, pitch, yaw):
     tosearch = (
         '<origin rpy="1.7453292519943295 0 0.2617993877991494" xyz="0.0 -0.2 0.0"/>'
     )
+    assert new_urdf_str.count(tosearch) == 1
     toreplace = f'<origin rpy="{np.pi/2 + roll} 0 {yaw}" xyz="0.0 -0.2 0.0"/>'
     new_urdf_str = new_urdf_str.replace(tosearch, toreplace)
 
